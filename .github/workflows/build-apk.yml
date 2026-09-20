@@ -48,4 +48,3 @@ jobs:
         with:
           name: HM-Studio-App
           path: project_folder/app/build/outputs/apk/debug/*.apk
-          
