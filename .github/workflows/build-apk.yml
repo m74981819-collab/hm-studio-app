@@ -18,21 +18,21 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Unzip Source
+      - name: Extract Source Zip
         run: |
-          find . -name "*.zip" -exec unzip -o {} \;
+          unzip -o "*.zip"
 
-      - name: Build APK with Gradle
+      - name: Build APK
         run: |
-          PROJ_DIR=$(dirname $(find . -name "gradlew" | head -n 1))
-          cd "$PROJ_DIR"
+          TARGET_DIR=$(dirname $(find . -name "gradlew" | head -n 1))
+          cd "$TARGET_DIR"
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload Finished APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: HM-Studio-App
+          name: HM-Studio-APK
           path: |
-            **/build/outputs/apk/debug/*.apk
-            **/*.apk
+            **/build/outputs/apk/**/*.apk
+          if-no-files-found: error
