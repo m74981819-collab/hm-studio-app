@@ -18,34 +18,43 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Locate and Prepare Android Project
+      - name: Extract and Locate Project
         run: |
-          # اگر فایل زیپ وجود دارد باز شود
-          if [ -f "android_source_for_github.zip" ]; then
-            python3 -c "import zipfile; zipfile.ZipFile('android_source_for_github.zip').extractall('.')"
-          fi
-
+          # اکسترکت فایل زیپ سورس در صورت وجود
+          python3 -c "
+          import os, zipfile
+          for f in os.listdir('.'):
+              if f.endswith('.zip'):
+                  print('Extracting:', f)
+                  with zipfile.ZipFile(f, 'r') as z:
+                      z.extractall('.')
+          "
+          
           # پیدا کردن محل فایل gradlew
           GRADLEW_PATH=$(find . -name "gradlew" -type f | head -n 1)
-          
           if [ -z "$GRADLEW_PATH" ]; then
             echo "Error: gradlew not found!"
             exit 1
           fi
-
+          
           PROJECT_DIR=$(dirname "$GRADLEW_PATH")
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
           chmod +x "$GRADLEW_PATH"
 
-      - name: Build with Gradle
+      - name: Build Debug APK
         run: |
           cd "$PROJECT_DIR"
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload Debug APK
+      - name: Locate and Collect APK
+        run: |
+          mkdir -p output-apk
+          find . -name "*.apk" -exec cp {} output-apk/ \;
+          ls -la output-apk/
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: HM-Studio-App-APK
-          path: |
-            **/build/outputs/apk/debug/*.apk
-            **/*.apk
+          path: output-apk/*.apk
+          if-no-files-found: error
