@@ -1,50 +1,51 @@
-# GitHub Actions Workflow for HM Studio APK Build
-# این فایل پروژه اندروید را اکسترکت کرده و APK نهایی را تولید می‌کند.
 
 name: Build Android APK
 
-# تعیین زمان اجرا: هنگام push روی شاخه main یا اجرای دستی (workflow_dispatch)
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
-    # سیستم‌عامل سرور مجازی اوبونتو
     runs-on: ubuntu-latest
-
     steps:
-      # دریافت فایل‌های مخزن گیت‌هاب
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # استخراج محتویات فایل زیپ در پوشه مشخص
-      - name: Extract Android Project
-        run: unzip -o android_source_for_github.zip -d project_folder
-
-      # نصب و آماده‌سازی نسخه ۱۷ جاوا
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # راه‌اندازی ابزار گرادل
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+      - name: Extract Android Source
+        run: |
+          echo "Finding source zip..."
+          ZIP_FILE=$(find . -maxdepth 2 -name "*.zip" | head -n 1)
+          if [ -n "$ZIP_FILE" ]; then
+            echo "Unzipping $ZIP_FILE..."
+            unzip -o "$ZIP_FILE"
+          fi
+          
+          GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
+          if [ -z "$GRADLEW_PATH" ]; then
+            echo "Error: gradlew not found!"
+            exit 1
+          fi
+          
+          PROJECT_DIR=$(dirname "$GRADLEW_PATH")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          chmod +x "$GRADLEW_PATH"
 
-      # دادن مجوز اجرایی به فایل گرادل
-      - name: Make gradlew executable
-        run: chmod +x project_folder/gradlew
-
-      # اجرای دستور بیلد گرادل برای تولید فایل APK دیباگ
       - name: Build Debug APK
-        run: cd project_folder && ./gradlew assembleDebug --no-daemon --stacktrace
+        run: |
+          cd "$PROJECT_DIR"
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
-      # ذخیره و آپلود فایل APK تولید شده در آرتیفکت‌ها
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HM-Studio-App
-          path: project_folder/app/build/outputs/apk/debug/*.apk
+          name: HM-Studio-App-APK
+          path: '**/build/outputs/apk/debug/*.apk'
+          if-no-files-found: error
