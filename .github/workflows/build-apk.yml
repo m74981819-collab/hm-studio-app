@@ -1,4 +1,4 @@
-name: Build Android APK
+     name: Build Android APK
 
 on:
   push:
@@ -18,31 +18,34 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Prepare Source & Grant Permissions
+      - name: Extract source and prepare Gradle
         run: |
-          # If there is any zip file, unzip it
-          find . -maxdepth 2 -name "*.zip" -exec unzip -o {} \; || true
+          # اگر فایل زیپ وجود دارد اکسترکت شود
+          if [ -f "android_source_for_github.zip" ]; then
+            unzip -o android_source_for_github.zip
+          fi
           
-          # Find gradlew in workspace
-          GRADLE_PATH=$(find . -name "gradlew" | head -n 1)
-          if [ -z "$GRADLE_PATH" ]; then
-            echo "::error::gradlew not found anywhere in repo!"
-            ls -la
+          # پیدا کردن مسیر دقیق gradlew
+          GRADLEW_PATH=$(find . -name "gradlew" -type f | head -n 1)
+          if [ -z "$GRADLEW_PATH" ]; then
+            echo "::error::gradlew not found!"
             exit 1
           fi
           
-          WORKDIR=$(dirname "$GRADLE_PATH")
-          echo "Found gradlew in: $WORKDIR"
-          echo "PROJECT_DIR=$WORKDIR" >> $GITHUB_ENV
-          chmod +x "$GRADLE_PATH"
+          PROJECT_ROOT=$(dirname "$GRADLEW_PATH")
+          echo "PROJECT_ROOT=$PROJECT_ROOT" >> $GITHUB_ENV
+          chmod +x "$GRADLEW_PATH"
 
-      - name: Build APK with Gradle
+      - name: Build Debug APK
         run: |
-          cd "$PROJECT_DIR"
-          ./gradlew assembleDebug --no-daemon
+          cd "$PROJECT_ROOT"
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: HM-Studio-App-APK
-          path: '**/build/outputs/apk/debug/*.apk'
+          path: |
+            **/build/outputs/apk/debug/*.apk
+            **/*.apk
+          if-no-files-found: error
