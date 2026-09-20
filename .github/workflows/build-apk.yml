@@ -18,43 +18,34 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Extract and Locate Project
+      - name: Extract zip and setup gradlew
         run: |
-          # اکسترکت فایل زیپ سورس در صورت وجود
-          python3 -c "
-          import os, zipfile
-          for f in os.listdir('.'):
-              if f.endswith('.zip'):
-                  print('Extracting:', f)
-                  with zipfile.ZipFile(f, 'r') as z:
-                      z.extractall('.')
-          "
-          
-          # پیدا کردن محل فایل gradlew
+          for f in *.zip; do
+            if [ -f "$f" ]; then
+              echo "Extracting $f..."
+              unzip -o "$f" || python3 -c "import zipfile; zipfile.ZipFile('$f').extractall('.')"
+            fi
+          done
+
           GRADLEW_PATH=$(find . -name "gradlew" -type f | head -n 1)
           if [ -z "$GRADLEW_PATH" ]; then
             echo "Error: gradlew not found!"
             exit 1
           fi
-          
+
+          chmod +x "$GRADLEW_PATH"
           PROJECT_DIR=$(dirname "$GRADLEW_PATH")
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
-          chmod +x "$GRADLEW_PATH"
 
       - name: Build Debug APK
         run: |
           cd "$PROJECT_DIR"
           ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Locate and Collect APK
-        run: |
-          mkdir -p output-apk
-          find . -name "*.apk" -exec cp {} output-apk/ \;
-          ls -la output-apk/
-
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: HM-Studio-App-APK
-          path: output-apk/*.apk
-          if-no-files-found: error
+          path: |
+            **/build/outputs/apk/debug/*.apk
+            **/*.apk
