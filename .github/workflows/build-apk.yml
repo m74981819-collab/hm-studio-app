@@ -9,43 +9,30 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: 'temurin'
+          java-version: '17'
 
-      - name: Extract zip and setup gradlew
+      - name: Unzip Source
         run: |
-          for f in *.zip; do
-            if [ -f "$f" ]; then
-              echo "Extracting $f..."
-              unzip -o "$f" || python3 -c "import zipfile; zipfile.ZipFile('$f').extractall('.')"
-            fi
-          done
+          find . -name "*.zip" -exec unzip -o {} \;
 
-          GRADLEW_PATH=$(find . -name "gradlew" -type f | head -n 1)
-          if [ -z "$GRADLEW_PATH" ]; then
-            echo "Error: gradlew not found!"
-            exit 1
-          fi
-
-          chmod +x "$GRADLEW_PATH"
-          PROJECT_DIR=$(dirname "$GRADLEW_PATH")
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
-
-      - name: Build Debug APK
+      - name: Build APK with Gradle
         run: |
-          cd "$PROJECT_DIR"
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          PROJ_DIR=$(dirname $(find . -name "gradlew" | head -n 1))
+          cd "$PROJ_DIR"
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK
+      - name: Upload Finished APK
         uses: actions/upload-artifact@v4
         with:
-          name: HM-Studio-App-APK
+          name: HM-Studio-App
           path: |
             **/build/outputs/apk/debug/*.apk
             **/*.apk
