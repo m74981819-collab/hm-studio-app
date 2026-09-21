@@ -8,42 +8,47 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Extract All Zip Files
-        run: |
-          shopt -s nullglob
-          for f in *.zip; do
-            echo "Extracting: $f"
-            unzip -o "$f"
-          done
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
 
-      - name: Build APK with Gradle
+      - name: Unzip Project if Needed
         run: |
-          GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
-          if [ -z "$GRADLEW_PATH" ]; then
-            echo "Error: gradlew not found!"
-            exit 1
+          if [ -f "android_source_for_github.zip" ]; then
+            echo "Unzipping android_source_for_github.zip..."
+            unzip -o -q android_source_for_github.zip
           fi
-          PROJECT_DIR=$(dirname "$GRADLEW_PATH")
-          echo "Found project in: $PROJECT_DIR"
-          cd "$PROJECT_DIR"
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
 
-      - name: Upload Output APK
+      - name: Find Android Project and Build APK
+        run: |
+          SETTINGS_FILE=$(find . -name "settings.gradle" -not -path "*/.*" | head -n 1)
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "settings.gradle not found, building from root..."
+            gradle assembleDebug --stacktrace --no-daemon
+          else
+            PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+            echo "Found Android project at: $PROJECT_DIR"
+            cd "$PROJECT_DIR"
+            gradle assembleDebug --stacktrace --no-daemon
+          fi
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HM-Studio-App
+          name: HM-Studio-Debug-APK
           path: |
             **/build/outputs/apk/debug/*.apk
             **/*.apk
-            
+          if-no-files-found: error
