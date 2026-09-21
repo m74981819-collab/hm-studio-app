@@ -19,34 +19,41 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Extract Project Files
-        run: |
-          if [ -f "android_source_for_github.zip" ]; then
-            echo "Unzipping android_source_for_github.zip..."
-            unzip -o -q android_source_for_github.zip
-          fi
-          # نمایش لیست فایل‌ها برای اطمینان از وجود پوشه
-          ls -la
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Build with Gradle Wrapper
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Extract Archives If Present
         run: |
-          # پیدا کردن مسیر دقیق پوشه اندروید
-          if [ -d "android-app" ]; then
-            cd android-app
-          elif [ -f "gradlew" ]; then
-            echo "Already in root"
-          else
-            TARGET_DIR=$(find . -name "gradlew" -exec dirname {} \; | head -n 1)
-            if [ -n "$TARGET_DIR" ]; then
-              cd "$TARGET_DIR"
+          for f in *.zip; do
+            if [ -f "$f" ]; then
+              echo "Extracting $f..."
+              unzip -o -q "$f"
             fi
+          done
+
+      - name: Compile APK
+        run: |
+          # پیدا کردن پوشه‌ای که حاوی settings.gradle یا build.gradle است
+          PROJECT_DIR=$(find . -name "settings.gradle" -exec dirname {} \; | head -n 1)
+          if [ -z "$PROJECT_DIR" ]; then
+            PROJECT_DIR=$(find . -name "build.gradle" -not -path "*/.*" -exec dirname {} \; | head -n 1)
           fi
+          
+          echo "Target Directory: $PROJECT_DIR"
+          cd "$PROJECT_DIR"
+          
+          # قبول کردن لایسنس‌های اندروید
+          yes | sdkmanager --licenses || true
+          
+          # اجرای مستقیم گرادل بدون نیاز به gradlew ناقص
+          gradle assembleDebug --no-daemon --stacktrace
 
-          echo "Current working directory: $(pwd)"
-          chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
-
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: HM-Studio-Debug-APK
