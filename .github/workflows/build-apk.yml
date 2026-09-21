@@ -1,49 +1,41 @@
-name: Build Android APK (from NOR_FINAL_V18_FINAL_DELIVERY.zip)
+name: Build Android APK
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on:, master ]
-  workflow_dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-jobs:
-  build:
-    runs-on: actions/checkout@v4
-
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: 17
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v3
 
-      - name: Setup Gradle 8.11.1
-        uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.11.1"
+          gradle-version: 8.11.1
 
-      - name: Unzip project
+      - name: Extract ZIP
         run: |
           ls -la
-          unzip -o "NOR_FINAL_V18_FINAL_DELIVERY.zip"
-          ls -la
-          ls -la android-app
+          unzip -o NOR_FINAL_V18_FINAL_DELIVERY.zip
 
-      - name: Build Debug APK
-        working-directory: android-app
+      - name: Build APK
         run: |
           yes | sdkmanager --licenses || true
-          gradle assembleDebug --no-daemon --stacktrace
+          cd android-app
+          gradle assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: HMStudio-debug-apk
-          path: android-app/app/build/outputs/apk/debug/*.apk
+          name: HMStudio-APK
+          path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
