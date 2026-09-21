@@ -22,31 +22,35 @@ jobs:
       - name: Extract Project Files
         run: |
           if [ -f "android_source_for_github.zip" ]; then
-            echo "Unzipping source..."
+            echo "Unzipping android_source_for_github.zip..."
             unzip -o -q android_source_for_github.zip
           fi
+          # نمایش لیست فایل‌ها برای اطمینان از وجود پوشه
+          ls -la
 
-      - name: Make Gradlew Executable and Build
+      - name: Build with Gradle Wrapper
         run: |
-          SETTINGS_FILE=$(find . -name "settings.gradle" -not -path "*/.*" | head -n 1)
-          if [ -n "$SETTINGS_FILE" ]; then
-            PROJECT_DIR=$(dirname "$SETTINGS_FILE")
-            echo "Moving to $PROJECT_DIR"
-            cd "$PROJECT_DIR"
-          fi
-          
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-            ./gradlew assembleDebug --stacktrace --no-daemon
+          # پیدا کردن مسیر دقیق پوشه اندروید
+          if [ -d "android-app" ]; then
+            cd android-app
+          elif [ -f "gradlew" ]; then
+            echo "Already in root"
           else
-            gradle assembleDebug --stacktrace --no-daemon
+            TARGET_DIR=$(find . -name "gradlew" -exec dirname {} \; | head -n 1)
+            if [ -n "$TARGET_DIR" ]; then
+              cd "$TARGET_DIR"
+            fi
           fi
 
-      - name: Upload APK
+          echo "Current working directory: $(pwd)"
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: HM-Studio-Debug-APK
           path: |
             **/build/outputs/apk/debug/*.apk
             **/*.apk
-          if-no-files-found: warn
+          if-no-files-found: error
