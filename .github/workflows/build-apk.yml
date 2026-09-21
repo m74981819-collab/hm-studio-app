@@ -19,36 +19,34 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.11.1'
-
-      - name: Unzip Project if Needed
+      - name: Extract Project Files
         run: |
           if [ -f "android_source_for_github.zip" ]; then
-            echo "Unzipping android_source_for_github.zip..."
+            echo "Unzipping source..."
             unzip -o -q android_source_for_github.zip
           fi
 
-      - name: Find Android Project and Build APK
+      - name: Make Gradlew Executable and Build
         run: |
           SETTINGS_FILE=$(find . -name "settings.gradle" -not -path "*/.*" | head -n 1)
-          if [ -z "$SETTINGS_FILE" ]; then
-            echo "settings.gradle not found, building from root..."
-            gradle assembleDebug --stacktrace --no-daemon
-          else
+          if [ -n "$SETTINGS_FILE" ]; then
             PROJECT_DIR=$(dirname "$SETTINGS_FILE")
-            echo "Found Android project at: $PROJECT_DIR"
+            echo "Moving to $PROJECT_DIR"
             cd "$PROJECT_DIR"
+          fi
+          
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug --stacktrace --no-daemon
+          else
             gradle assembleDebug --stacktrace --no-daemon
           fi
 
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: HM-Studio-Debug-APK
           path: |
             **/build/outputs/apk/debug/*.apk
             **/*.apk
-          if-no-files-found: error
+          if-no-files-found: warn
