@@ -22,41 +22,44 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup Gradle
+      - name: Setup Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
 
-      - name: Extract Archives If Present
+      - name: Extract Project Files
         run: |
+          echo "=== Files in Root ==="
+          ls -la
           for f in *.zip; do
             if [ -f "$f" ]; then
-              echo "Extracting $f..."
+              echo "Extracting: $f"
               unzip -o -q "$f"
             fi
           done
+          echo "=== Files after extract ==="
+          ls -la
 
       - name: Compile APK
         run: |
-          # پیدا کردن پوشه‌ای که حاوی settings.gradle یا build.gradle است
-          PROJECT_DIR=$(find . -name "settings.gradle" -exec dirname {} \; | head -n 1)
+          # پیدا کردن مسیر پروژه اندروید
+          PROJECT_DIR=$(find . -maxdepth 3 -name "settings.gradle" -exec dirname {} \; | head -n 1)
           if [ -z "$PROJECT_DIR" ]; then
-            PROJECT_DIR=$(find . -name "build.gradle" -not -path "*/.*" -exec dirname {} \; | head -n 1)
+            PROJECT_DIR="."
           fi
-          
-          echo "Target Directory: $PROJECT_DIR"
+          echo "Project Directory is: $PROJECT_DIR"
           cd "$PROJECT_DIR"
           
-          # قبول کردن لایسنس‌های اندروید
+          # تایید لایسنس‌ها
           yes | sdkmanager --licenses || true
           
-          # اجرای مستقیم گرادل بدون نیاز به gradlew ناقص
+          # بیلد نهایی
           gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: HM-Studio-Debug-APK
+          name: HMStudio-Debug-APK
           path: |
             **/build/outputs/apk/debug/*.apk
             **/*.apk
