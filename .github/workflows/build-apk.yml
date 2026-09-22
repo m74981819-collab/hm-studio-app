@@ -1,0 +1,32 @@
+name: Build Android APK # نام کلی این پروسه در گیت‌هاب
+
+on: [push] # هر زمان که کدی به ریپازیتوری پوش (Push) کردی، این پروسه اجرا شود
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # استفاده از سرورهای گیت‌هاب برای بیلد گرفتن (سیستم‌عامل اوبونتو)
+
+    steps:
+      - name: Checkout repository # دریافت فایل‌های ریپازیتوری
+        uses: actions/checkout@v4
+
+      - name: Extract zip # باز کردن فایل زیپ پروژه
+        run: unzip -o android_source_for_github.zip -d .
+
+      - name: Set up JDK # تنظیم جاوا برای اندروید
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Grant execute permission # دادن دسترسی اجرا به فایل گرادل
+        run: chmod +x gradlew
+
+      - name: Build with Gradle # اجرای دستور ساخت فایل APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK # آپلود فایل خروجی برای دانلود
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
