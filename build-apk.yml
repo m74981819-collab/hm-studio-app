@@ -1,8 +1,0 @@
-    - name: Extract zip
-      run: unzip NOR_FINAL_V18_FINAL_DELIVERY.zip
-
-    - name: Build with Gradle
-      run: |
-        cd android-app
-        chmod +x gradlew
-        ./gradlew assembleDebug
