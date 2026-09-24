@@ -85,15 +85,7 @@ jobs:
           ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Locate generated APK
-        shell: bash
-        run: |
-          set -e
-
-          echo "Searching for generated APK..."
-
-          APK_FILE="$(find "$PROJECT_DIR" -type f -name "*.apk" -print -quit)"
-
-          if [ -z "$APK_FILE" ]; then
+        
             echo "ERROR: APK was not generated."
             echo "Build directory:"
             find "$PROJECT_DIR" -maxdepth 6 -type d -name "outputs" -print
@@ -109,7 +101,6 @@ jobs:
 
           echo "Final artifact:"
           ls -lh artifact/app-debug.apk
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
