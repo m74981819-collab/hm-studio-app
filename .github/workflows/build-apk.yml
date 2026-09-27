@@ -1,10 +1,14 @@
-name: Build HM Studio APK V3
+name: Build Android APK V3
 
 on:
   workflow_dispatch:
   push:
     branches:
       - main
+      - master
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -22,27 +26,42 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Setup Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
       - name: Find V3 ZIP
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          echo "Searching for V3 ZIP..."
+          echo "======================================"
+          echo "SEARCHING FOR V3 ZIP"
+          echo "======================================"
 
-          ZIP_FILE=$(find . -maxdepth 1 -type f \
-            -name "hm-studio-app-v3-corrected.zip" \
-            -print -quit)
+          ZIP_FILE=""
+
+          for f in ./*.zip; do
+            if [ -f "$f" ]; then
+              NAME="$(basename "$f")"
+
+              if [ "$NAME" = "hm-studio-app-v3-corrected.zip" ]; then
+                ZIP_FILE="$f"
+                break
+              fi
+            fi
+          done
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: V3 ZIP not found."
-
-            echo "ZIP files found:"
+            echo "ERROR: hm-studio-app-v3-corrected.zip was not found."
+            echo ""
+            echo "ZIP files currently in repository:"
             find . -maxdepth 1 -type f -name "*.zip" -print
-
             exit 1
           fi
 
-          echo "Found:"
+          echo "FOUND:"
           echo "$ZIP_FILE"
 
           echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
@@ -50,82 +69,103 @@ jobs:
       - name: Extract V3 Project
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           rm -rf extracted
           mkdir -p extracted
 
-          unzip -q "$ZIP_FILE" -d extracted
+          echo "Extracting:"
+          echo "$ZIP_FILE"
 
-          echo "ZIP extracted."
+          unzip -q -o "$ZIP_FILE" -d extracted
 
-          echo "Project files:"
-          find extracted -maxdepth 5 -type f | sort | head -300
+          echo ""
+          echo "Checking Android project..."
 
-      - name: Find Android Project
+          test -f extracted/settings.gradle
+          test -f extracted/build.gradle
+          test -f extracted/app/build.gradle
+          test -f extracted/app/src/main/AndroidManifest.xml
+
+          echo "Android project detected."
+
+      - name: Show Project Structure
         shell: bash
         run: |
-          set -e
+          echo "======================================"
+          echo "PROJECT STRUCTURE"
+          echo "======================================"
 
-          GRADLEW=$(find extracted -type f -name "gradlew" -print -quit)
-
-          if [ -z "$GRADLEW" ]; then
-            echo "ERROR: gradlew not found."
-
-            find extracted -type f | sort
-
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$GRADLEW")
-
-          echo "Android project:"
-          echo "$PROJECT_DIR"
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          find extracted -maxdepth 5 -type f | sort
 
       - name: Build Debug APK
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          cd "$PROJECT_DIR"
+          echo "======================================"
+          echo "BUILDING DEBUG APK"
+          echo "======================================"
 
-          chmod +x gradlew
+          cd extracted
 
-          echo "Starting Android build..."
+          echo "Gradle version:"
+          gradle --version
 
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+          echo ""
+          echo "Running assembleDebug..."
 
-          echo "BUILD COMPLETED."
+          gradle \
+            --no-daemon \
+            --stacktrace \
+            --console=plain \
+            :app:assembleDebug
 
-      - name: Find APK
+          echo ""
+          echo "Gradle assembleDebug finished."
+
+          echo ""
+          echo "Searching build directories..."
+
+          find . -type d -name build -print
+
+          echo ""
+          echo "Searching APK files..."
+
+          find . -type f -name "*.apk" -print
+
+      - name: Verify APK
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          echo "Searching for APK..."
+          echo "======================================"
+          echo "VERIFYING APK"
+          echo "======================================"
 
-          APK=$(find "$PROJECT_DIR" \
-            -type f \
-            -name "*.apk" \
-            -print -quit)
+          APK_FILE="$(find extracted -type f -name "*.apk" -print -quit)"
 
-          if [ -z "$APK" ]; then
-            echo "ERROR: APK was not generated."
-
-            echo "Build directories:"
-            find "$PROJECT_DIR" -type d -name "build" -print
-
+          if [ -z "$APK_FILE" ]; then
+            echo ""
+            echo "ERROR: APK was NOT generated."
+            echo ""
+            echo "All files under app/build:"
+            find extracted/app/build -type f -print 2>/dev/null || true
+            echo ""
+            echo "Gradle project directories:"
+            find extracted -type d -maxdepth 6 | sort
             exit 1
           fi
 
+          echo ""
           echo "APK FOUND:"
-          echo "$APK"
+          echo "$APK_FILE"
 
           mkdir -p artifact
 
-          cp "$APK" artifact/HM-Studio-V3-debug.apk
+          cp "$APK_FILE" artifact/HM-Studio-V3-debug.apk
+
+          ls -lh artifact/HM-Studio-V3-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -133,4 +173,4 @@ jobs:
           name: HM-Studio-V3-APK
           path: artifact/HM-Studio-V3-debug.apk
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
