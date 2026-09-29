@@ -1,10 +1,10 @@
 name: Build Android APK V4
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,20 +15,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Java 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Setup Gradle 8.11.1
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.11.1'
 
       - name: Find V4 ZIP
         shell: bash
@@ -39,22 +33,31 @@ jobs:
           echo "SEARCHING FOR V4 ZIP"
           echo "======================================"
 
-          ZIP_FILE="$(find . -maxdepth 1 -type f \
-            -name 'hm-studio-app-v4-professional-fixed*.zip' \
-            -print -quit)"
+          ZIP_FILE=""
+
+          for file in \
+            "hm-studio-app-v4-professional-fixed (1).zip" \
+            "hm-studio-app-v4-professional-fixed.zip" \
+            "hm-studio-app-v4-fixed-build.zip"
+          do
+            if [ -f "$file" ]; then
+              ZIP_FILE="$file"
+              break
+            fi
+          done
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: V4 ZIP NOT FOUND"
-
-            echo ""
-            echo "ZIP FILES FOUND:"
-            find . -maxdepth 1 -type f -name "*.zip" -print
-
+            echo "ERROR: V4 ZIP was not found."
+            echo "Files in repository:"
+            find . -maxdepth 2 -type f -print
             exit 1
           fi
 
-          echo "V4 ZIP FOUND:"
+          echo "Found ZIP:"
           echo "$ZIP_FILE"
+
+          echo "ZIP contents:"
+          unzip -l "$ZIP_FILE" | head -100
 
           echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
 
@@ -66,121 +69,78 @@ jobs:
           rm -rf extracted
           mkdir -p extracted
 
+          unzip -q "$ZIP_FILE" -d extracted
+
           echo "======================================"
-          echo "EXTRACTING V4 PROJECT"
+          echo "EXTRACTED FILES"
           echo "======================================"
 
-          unzip -q -o "$ZIP_FILE" -d extracted
+          find extracted -maxdepth 5 -type f -print | head -300
 
-          echo ""
-          echo "EXTRACTED FILES:"
-          find extracted -maxdepth 6 -type f | sort
-
-      - name: Locate Android Project
+      - name: Find Android Project
         shell: bash
         run: |
           set -e
 
           echo "======================================"
-          echo "LOCATING ANDROID PROJECT"
+          echo "SEARCHING FOR ANDROID PROJECT"
           echo "======================================"
 
           PROJECT_DIR=""
 
-          if [ -f "extracted/settings.gradle" ] && \
-             [ -f "extracted/app/build.gradle" ]; then
-            PROJECT_DIR="extracted"
-          else
-            SETTINGS_FILE="$(find extracted -type f \
-              -name "settings.gradle" \
-              -print -quit)"
+          while IFS= read -r gradle_file; do
+            DIR="$(dirname "$gradle_file")"
 
-            if [ -n "$SETTINGS_FILE" ]; then
-              PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
+            if [ -f "$DIR/gradlew" ] && [ -f "$DIR/settings.gradle" -o -f "$DIR/settings.gradle.kts" ]; then
+              PROJECT_DIR="$DIR"
+              break
+            fi
+          done < <(find extracted -type f -name "build.gradle" -o -name "build.gradle.kts")
+
+          if [ -z "$PROJECT_DIR" ]; then
+            if [ -f extracted/gradlew ] && [ -f extracted/settings.gradle ]; then
+              PROJECT_DIR="extracted"
+            elif [ -f extracted/gradlew ] && [ -f extracted/settings.gradle.kts ]; then
+              PROJECT_DIR="extracted"
             fi
           fi
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: Android project was not found."
-
+            echo "ERROR: Android Gradle project was not found."
             echo ""
-            echo "Gradle files:"
-            find extracted -type f \
-              \( -name "settings.gradle" \
+            echo "Searching for Gradle files:"
+            find extracted -type f \( \
+              -name "gradlew" \
+              -o -name "settings.gradle" \
+              -o -name "settings.gradle.kts" \
               -o -name "build.gradle" \
-              -o -name "build.gradle.kts" \) \
-              -print
-
+              -o -name "build.gradle.kts" \
+            \) -print
             exit 1
           fi
 
-          echo "ANDROID PROJECT:"
+          echo "Android project found:"
           echo "$PROJECT_DIR"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Check Android Project
+      - name: Prepare Gradle
         shell: bash
         run: |
           set -e
 
-          echo "======================================"
-          echo "CHECKING ANDROID PROJECT"
-          echo "======================================"
+          cd "$PROJECT_DIR"
 
-          test -f "$PROJECT_DIR/settings.gradle"
-          test -f "$PROJECT_DIR/app/build.gradle"
-          test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
-
-          echo "Android project structure is valid."
-            - name: Fix MainActivity.java
-        shell: bash
-        run: |
-          set -e
-
-          FILE="$PROJECT_DIR/app/src/main/java/com/hmstudio/app/MainActivity.java"
-
-          echo "======================================"
-          echo "CHECKING MAINACTIVITY.JAVA"
-          echo "======================================"
-
-          if [ ! -f "$FILE" ]; then
-            echo "ERROR: MainActivity.java not found:"
-            echo "$FILE"
+          if [ ! -f "./gradlew" ]; then
+            echo "ERROR: gradlew was not found."
             exit 1
           fi
 
-          echo "Fixing malformed closed string..."
+          chmod +x ./gradlew
 
-          python3 - "$FILE" <<'PY'
-import sys
+          echo "Gradle wrapper:"
+          ./gradlew --version
 
-path = sys.argv[1]
-
-with open(path, "r", encoding="utf-8") as f:
-    lines = f.readlines()
-
-# Current broken line is line 243.
-# Replace it safely with valid Java.
-if len(lines) >= 243:
-    lines[242] = '                if (!"closed".equals(value)) {\n'
-
-with open(path, "w", encoding="utf-8") as f:
-    f.writelines(lines)
-
-print("MainActivity.java fixed.")
-
-# Verify the corrected line.
-with open(path, "r", encoding="utf-8") as f:
-    check = f.readlines()
-
-print("Line 243:")
-print(check[242].rstrip())
-PY
-
-          echo ""
-          echo "MainActivity.java correction completed."
-          
       - name: Build Debug APK
         shell: bash
         run: |
@@ -192,43 +152,7 @@ PY
           echo "BUILDING DEBUG APK"
           echo "======================================"
 
-          echo "Gradle version:"
-          gradle --version
-
-          echo ""
-          echo "Starting Gradle build..."
-
-          gradle \
-            :app:assembleDebug \
-            --no-daemon \
-            --stacktrace \
-            --console=plain
-
-          echo ""
-          echo "======================================"
-          echo "GRADLE BUILD FINISHED"
-          echo "======================================"
-
-      - name: Show Build Output
-        shell: bash
-        run: |
-          echo "======================================"
-          echo "BUILD OUTPUT"
-          echo "======================================"
-
-          echo ""
-          echo "APK FILES:"
-          find "$PROJECT_DIR" \
-            -type f \
-            -name "*.apk" \
-            -print || true
-
-          echo ""
-          echo "BUILD DIRECTORIES:"
-          find "$PROJECT_DIR" \
-            -type d \
-            -name "build" \
-            -print || true
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Find Generated APK
         shell: bash
@@ -239,45 +163,36 @@ PY
           echo "SEARCHING FOR GENERATED APK"
           echo "======================================"
 
-          APK_FILE="$(find "$PROJECT_DIR" \
-            -type f \
-            -name "*.apk" \
-            -print -quit)"
+          APK_FILE=""
+
+          if [ -d "$PROJECT_DIR" ]; then
+            APK_FILE="$(find "$PROJECT_DIR" -type f -path "*/build/outputs/apk/debug/*.apk" | head -1)"
+          fi
 
           if [ -z "$APK_FILE" ]; then
+            echo "ERROR: APK was not generated."
             echo ""
-            echo "ERROR: APK WAS NOT GENERATED."
-
+            echo "Build directories:"
+            find "$PROJECT_DIR" -type d -name build -print || true
             echo ""
-            echo "FILES UNDER PROJECT:"
-            find "$PROJECT_DIR" -type f | sort
-
-            echo ""
-            echo "FILES UNDER APP/BUILD:"
-            find "$PROJECT_DIR/app/build" \
-              -type f \
-              -print 2>/dev/null || true
-
+            echo "APK-like files:"
+            find "$PROJECT_DIR" -type f -name "*.apk" -print || true
             exit 1
           fi
 
-          echo ""
           echo "APK FOUND:"
           echo "$APK_FILE"
 
-          mkdir -p artifact
+          mkdir -p "$GITHUB_WORKSPACE/apk-output"
 
-          cp "$APK_FILE" \
-            artifact/HM-Studio-V4-debug.apk
+          cp "$APK_FILE" "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v4-debug.apk"
 
-          echo ""
-          echo "FINAL APK:"
-          ls -lh artifact/HM-Studio-V4-debug.apk
+          echo "APK copied to:"
+          echo "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v4-debug.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: HM-Studio-V4-APK
-          path: artifact/HM-Studio-V4-debug.apk
+          name: hm-studio-app-v4-debug
+          path: apk-output/hm-studio-app-v4-debug.apk
           if-no-files-found: error
-          retention-days: 14
