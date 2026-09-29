@@ -24,103 +24,113 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Find V4 ZIP
+      - name: Show repository files
         shell: bash
         run: |
           set -e
 
           echo "======================================"
-          echo "SEARCHING FOR V4 ZIP"
+          echo "REPOSITORY FILES"
+          echo "======================================"
+
+          pwd
+
+          echo ""
+          echo "ZIP FILES:"
+          find . -type f -name "*.zip" -print || true
+
+          echo ""
+          echo "GRADLE FILES:"
+          find . -type f \( \
+            -name "gradlew" \
+            -o -name "settings.gradle" \
+            -o -name "settings.gradle.kts" \
+            -o -name "build.gradle" \
+            -o -name "build.gradle.kts" \
+          \) -print || true
+
+      - name: Find project ZIP
+        shell: bash
+        run: |
+          set -e
+
+          echo "======================================"
+          echo "FINDING PROJECT ZIP"
           echo "======================================"
 
           ZIP_FILE=""
 
-          for file in \
-            "hm-studio-app-v4-professional-fixed (1).zip" \
-            "hm-studio-app-v4-professional-fixed.zip" \
-            "hm-studio-app-v4-fixed-build.zip"
-          do
-            if [ -f "$file" ]; then
-              ZIP_FILE="$file"
-              break
-            fi
-          done
+          ZIP_FILE="$(find . -maxdepth 2 -type f -name "hm-studio-app-v4*.zip" | head -1 || true)"
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: V4 ZIP was not found."
-            echo "Files in repository:"
-            find . -maxdepth 2 -type f -print
+            ZIP_FILE="$(find . -maxdepth 2 -type f -name "*.zip" | head -1 || true)"
+          fi
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: No ZIP file was found in the repository."
             exit 1
           fi
 
-          echo "Found ZIP:"
+          echo "ZIP FOUND:"
           echo "$ZIP_FILE"
-
-          echo "ZIP contents:"
-          unzip -l "$ZIP_FILE" | head -100
 
           echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
 
-      - name: Extract V4 Project
+      - name: Extract project
         shell: bash
         run: |
           set -e
+
+          echo "======================================"
+          echo "EXTRACTING PROJECT"
+          echo "======================================"
 
           rm -rf extracted
           mkdir -p extracted
 
           unzip -q "$ZIP_FILE" -d extracted
 
-          echo "======================================"
-          echo "EXTRACTED FILES"
-          echo "======================================"
+          echo ""
+          echo "EXTRACTED FILES:"
+          find extracted -maxdepth 6 -type f -print | head -400
 
-          find extracted -maxdepth 5 -type f -print | head -300
-
-      - name: Find Android Project
+      - name: Find Gradle project
         shell: bash
         run: |
           set -e
 
           echo "======================================"
-          echo "SEARCHING FOR ANDROID PROJECT"
+          echo "FINDING GRADLE PROJECT"
           echo "======================================"
 
-          PROJECT_DIR=""
+          GRADLEW_FILE="$(find extracted -type f -name "gradlew" | head -1 || true)"
 
-          while IFS= read -r gradle_file; do
-            DIR="$(dirname "$gradle_file")"
-
-            if [ -f "$DIR/gradlew" ] && [ -f "$DIR/settings.gradle" -o -f "$DIR/settings.gradle.kts" ]; then
-              PROJECT_DIR="$DIR"
-              break
-            fi
-          done < <(find extracted -type f -name "build.gradle" -o -name "build.gradle.kts")
-
-          if [ -z "$PROJECT_DIR" ]; then
-            if [ -f extracted/gradlew ] && [ -f extracted/settings.gradle ]; then
-              PROJECT_DIR="extracted"
-            elif [ -f extracted/gradlew ] && [ -f extracted/settings.gradle.kts ]; then
-              PROJECT_DIR="extracted"
-            fi
-          fi
-
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: Android Gradle project was not found."
+          if [ -z "$GRADLEW_FILE" ]; then
+            echo "ERROR: gradlew was not found."
             echo ""
-            echo "Searching for Gradle files:"
+            echo "All Gradle-related files:"
             find extracted -type f \( \
               -name "gradlew" \
               -o -name "settings.gradle" \
               -o -name "settings.gradle.kts" \
               -o -name "build.gradle" \
               -o -name "build.gradle.kts" \
-            \) -print
+            \) -print || true
             exit 1
           fi
 
-          echo "Android project found:"
+          PROJECT_DIR="$(dirname "$GRADLEW_FILE")"
+
+          echo "gradlew:"
+          echo "$GRADLEW_FILE"
+
+          echo ""
+          echo "PROJECT DIRECTORY:"
           echo "$PROJECT_DIR"
+
+          if [ ! -f "$PROJECT_DIR/settings.gradle" ] && [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
+            echo "WARNING: settings.gradle was not found directly in project directory."
+          fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
@@ -131,17 +141,17 @@ jobs:
 
           cd "$PROJECT_DIR"
 
-          if [ ! -f "./gradlew" ]; then
-            echo "ERROR: gradlew was not found."
-            exit 1
-          fi
+          echo "======================================"
+          echo "PREPARING GRADLE"
+          echo "======================================"
 
           chmod +x ./gradlew
 
-          echo "Gradle wrapper:"
+          echo ""
+          echo "Gradle version:"
           ./gradlew --version
 
-      - name: Build Debug APK
+      - name: Build Android APK
         shell: bash
         run: |
           set -e
@@ -149,46 +159,70 @@ jobs:
           cd "$PROJECT_DIR"
 
           echo "======================================"
-          echo "BUILDING DEBUG APK"
+          echo "STARTING ANDROID BUILD"
           echo "======================================"
+
+          echo ""
+          echo "Project directory:"
+          pwd
+
+          echo ""
+          echo "Project files:"
+          find . -maxdepth 3 -type f -print | head -300
+
+          echo ""
+          echo "Running Gradle..."
+          echo ""
 
           ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Find Generated APK
+          echo ""
+          echo "======================================"
+          echo "GRADLE BUILD FINISHED"
+          echo "======================================"
+
+      - name: Search for APK
         shell: bash
         run: |
           set -e
 
           echo "======================================"
-          echo "SEARCHING FOR GENERATED APK"
+          echo "SEARCHING FOR APK"
           echo "======================================"
 
-          APK_FILE=""
+          echo ""
+          echo "All build directories:"
+          find "$PROJECT_DIR" -type d -name "build" -print || true
 
-          if [ -d "$PROJECT_DIR" ]; then
-            APK_FILE="$(find "$PROJECT_DIR" -type f -path "*/build/outputs/apk/debug/*.apk" | head -1)"
-          fi
+          echo ""
+          echo "All APK files:"
+          find "$PROJECT_DIR" -type f -name "*.apk" -print || true
+
+          APK_FILE="$(find "$PROJECT_DIR" -type f -path "*/build/outputs/apk/debug/*.apk" | head -1 || true)"
 
           if [ -z "$APK_FILE" ]; then
+            echo ""
             echo "ERROR: APK was not generated."
             echo ""
-            echo "Build directories:"
-            find "$PROJECT_DIR" -type d -name build -print || true
-            echo ""
-            echo "APK-like files:"
-            find "$PROJECT_DIR" -type f -name "*.apk" -print || true
+            echo "Checking Gradle output directories:"
+            find "$PROJECT_DIR" -type d -path "*/build/outputs/*" -print || true
             exit 1
           fi
 
-          echo "APK FOUND:"
+          echo ""
+          echo "======================================"
+          echo "APK FOUND"
+          echo "======================================"
+
           echo "$APK_FILE"
 
-          mkdir -p "$GITHUB_WORKSPACE/apk-output"
+          mkdir -p apk-output
 
-          cp "$APK_FILE" "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v4-debug.apk"
+          cp "$APK_FILE" "apk-output/hm-studio-app-v4-debug.apk"
 
-          echo "APK copied to:"
-          echo "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v4-debug.apk"
+          echo ""
+          echo "APK copied successfully:"
+          ls -lh "apk-output/hm-studio-app-v4-debug.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
