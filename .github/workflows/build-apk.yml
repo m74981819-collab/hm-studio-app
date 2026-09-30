@@ -1,247 +1,997 @@
-name: Build Android APK V5
+package com.hmstudio.app;
 
-on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+import android.Manifest;
+import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.provider.Settings;
+import android.view.Gravity;
+import android.view.View;
+import android.view.Window;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
+import android.widget.Toast;
 
-permissions:
-  contents: read
+import java.util.Locale;
 
-jobs:
-  build:
-    name: Build HM Studio APK
-    runs-on: ubuntu-latest
+public class MainActivity extends Activity {
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    private WebView webView;
+    private FrameLayout root;
+    private View loadingView;
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+    private static final int COLOR_BG = Color.rgb(10, 10, 12);
 
-      - name: Find project ZIP
-        shell: bash
-        run: |
-          set -e
+    private static final String HOME_URL =
+            "file:///android_asset/index.html";
 
-          echo "======================================"
-          echo "FINDING PROJECT ZIP"
-          echo "======================================"
+    @SuppressLint("SetJavaScriptEnabled")
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
 
-          ZIP_FILE=""
+        configureWindow();
 
-          if [ -f "hm-studio-app-v5-final.zip" ]; then
-            ZIP_FILE="hm-studio-app-v5-final.zip"
-          fi
+        root = new FrameLayout(this);
+        root.setBackgroundColor(COLOR_BG);
 
-          if [ -z "$ZIP_FILE" ] && [ -f "hm-studio-app-v5-complete-root.zip" ]; then
-            ZIP_FILE="hm-studio-app-v5-complete-root.zip"
-          fi
+        webView = new WebView(this);
+        webView.setBackgroundColor(COLOR_BG);
 
-          if [ -z "$ZIP_FILE" ] && [ -f "hm-studio-app-v5-complete.zip" ]; then
-            ZIP_FILE="hm-studio-app-v5-complete.zip"
-          fi
+        FrameLayout.LayoutParams webParams =
+                new FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                );
 
-          if [ -z "$ZIP_FILE" ]; then
-            ZIP_FILE=$(find . -maxdepth 1 -type f -iname 'hm-studio-app*.zip' -print -quit || true)
-          fi
+        root.addView(webView, webParams);
 
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: No HM Studio ZIP file was found."
-            echo ""
-            echo "Files in repository:"
-            find . -maxdepth 2 -type f -print | sort
-            exit 1
-          fi
+        setContentView(root);
 
-          echo "Using project ZIP:"
-          echo "$ZIP_FILE"
+        configureWebView();
+        configureJavascriptBridge();
 
-          echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
+        webView.loadUrl(HOME_URL);
+    }
 
-      - name: Extract project
-        shell: bash
-        run: |
-          set -e
+    private void configureWindow() {
+        Window window = getWindow();
 
-          echo "======================================"
-          echo "EXTRACTING PROJECT"
-          echo "======================================"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            window.setStatusBarColor(Color.rgb(8, 8, 10));
+            window.setNavigationBarColor(Color.rgb(8, 8, 10));
+        }
 
-          rm -rf extracted
-          mkdir -p extracted
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowInsetsController controller =
+                    window.getInsetsController();
 
-          unzip -q "$ZIP_FILE" -d extracted
+            if (controller != null) {
+                controller.setSystemBarsBehavior(
+                        WindowInsetsController.BEHAVIOR_DEFAULT
+                );
+            }
+        }
+    }
 
-          echo ""
-          echo "Extracted project files:"
-          find extracted -maxdepth 6 -type f -print | head -400
+    @SuppressLint("SetJavaScriptEnabled")
+    private void configureWebView() {
 
-      - name: Locate Android project
-        shell: bash
-        run: |
-          set -e
+        WebSettings settings = webView.getSettings();
 
-          echo "======================================"
-          echo "LOCATING ANDROID PROJECT"
-          echo "======================================"
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        settings.setMediaPlaybackRequiresUserGesture(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
+        settings.setSupportZoom(false);
+        settings.setLoadWithOverviewMode(false);
+        settings.setUseWideViewPort(false);
 
-          PROJECT_DIR=""
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            settings.setMixedContentMode(
+                    WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            );
+        }
 
-          SETTINGS_FILE=$(find extracted \
-            -type f \
-            \( -name "settings.gradle" -o -name "settings.gradle.kts" \) \
-            -print -quit || true)
+        webView.setVerticalScrollBarEnabled(false);
+        webView.setHorizontalScrollBarEnabled(false);
+        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
-          if [ -n "$SETTINGS_FILE" ]; then
-            PROJECT_DIR=$(dirname "$SETTINGS_FILE")
-          fi
+        webView.setWebChromeClient(new WebChromeClient());
 
-          if [ -z "$PROJECT_DIR" ]; then
-            GRADLE_FILE=$(find extracted \
-              -type f \
-              -name "build.gradle" \
-              -print -quit || true)
+        webView.setWebViewClient(new WebViewClient() {
 
-            if [ -n "$GRADLE_FILE" ]; then
-              PROJECT_DIR=$(dirname "$GRADLE_FILE")
-            fi
-          fi
+            @Override
+            public boolean shouldOverrideUrlLoading(
+                    WebView view,
+                    WebResourceRequest request) {
 
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: Android Gradle project was not found."
+                if (request == null || request.getUrl() == null) {
+                    return false;
+                }
 
-            echo ""
-            echo "Gradle files found:"
-            find extracted -type f \
-              \( -name "settings.gradle" -o -name "settings.gradle.kts" -o -name "build.gradle" -o -name "build.gradle.kts" \) \
-              -print || true
+                String url = request.getUrl().toString();
 
-            exit 1
-          fi
+                if (url.startsWith("http://") ||
+                        url.startsWith("https://")) {
 
-          echo "Android project directory:"
-          echo "$PROJECT_DIR"
+                    Intent intent = new Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse(url)
+                    );
 
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+                    try {
+                        startActivity(intent);
+                        return true;
+                    } catch (Exception ignored) {
+                        return false;
+                    }
+                }
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.11.1'
+                if (url.startsWith("tel:") ||
+                        url.startsWith("sms:") ||
+                        url.startsWith("mailto:") ||
+                        url.startsWith("geo:") ||
+                        url.startsWith("whatsapp:") ||
+                        url.startsWith("tg:")) {
 
-      - name: Check Android project
-        shell: bash
-        run: |
-          set -e
+                    openExternalUrl(url);
+                    return true;
+                }
 
-          cd "$PROJECT_DIR"
+                return false;
+            }
 
-          echo "======================================"
-          echo "CHECKING ANDROID PROJECT"
-          echo "======================================"
+            @Override
+            public boolean shouldOverrideUrlLoading(
+                    WebView view,
+                    String url) {
 
-          echo "Current directory:"
-          pwd
+                if (url == null) {
+                    return false;
+                }
 
-          echo ""
-          echo "Project contents:"
-          ls -la
+                if (url.startsWith("http://") ||
+                        url.startsWith("https://") ||
+                        url.startsWith("tel:") ||
+                        url.startsWith("sms:") ||
+                        url.startsWith("mailto:") ||
+                        url.startsWith("geo:") ||
+                        url.startsWith("whatsapp:") ||
+                        url.startsWith("tg:")) {
 
-          echo ""
-          echo "App module:"
-          if [ -d "app" ]; then
-            ls -la app
-          else
-            echo "WARNING: app directory was not found."
-          fi
+                    openExternalUrl(url);
+                    return true;
+                }
 
-      - name: Build Debug APK
-        shell: bash
-        run: |
-          set -e
+                return false;
+            }
 
-          cd "$PROJECT_DIR"
+            @Override
+            public void onPageFinished(
+                    WebView view,
+                    String url) {
 
-          echo "======================================"
-          echo "BUILDING DEBUG APK"
-          echo "======================================"
+                super.onPageFinished(view, url);
 
-          echo "Gradle version:"
-          gradle --version
+                injectNavigationFixes();
 
-          echo ""
-          echo "Running Gradle..."
+                webView.postDelayed(
+                        MainActivity.this::injectNavigationFixes,
+                        300
+                );
 
-          gradle :app:assembleDebug \
-            --no-daemon \
-            --stacktrace
+                webView.postDelayed(
+                        MainActivity.this::injectNavigationFixes,
+                        1000
+                );
+            }
+        });
+    }
 
-      - name: Find generated APK
-        shell: bash
-        run: |
-          set -e
+    private void configureJavascriptBridge() {
 
-          echo "======================================"
-          echo "SEARCHING FOR GENERATED APK"
-          echo "======================================"
+        webView.addJavascriptInterface(
+                new AndroidBridge(),
+                "Android"
+        );
+    }
 
-          APK_FILE=$(find "$PROJECT_DIR" \
-            -type f \
-            -name "*.apk" \
-            -print -quit || true)
+    private void openExternalUrl(String url) {
 
-          if [ -z "$APK_FILE" ]; then
-            echo "ERROR: APK was not generated."
+        try {
+            Intent intent = new Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse(url)
+            );
 
-            echo ""
-            echo "Checking build directories:"
-            find "$PROJECT_DIR" \
-              -type d \
-              -name "build" \
-              -print || true
+            startActivity(intent);
 
-            echo ""
-            echo "Checking APK output directories:"
-            find "$PROJECT_DIR" \
-              -type f \
-              -path "*/build/outputs/*" \
-              -print || true
+        } catch (Exception e) {
 
-            echo ""
-            echo "All APK files:"
-            find . \
-              -type f \
-              -name "*.apk" \
-              -print || true
+            Toast.makeText(
+                    this,
+                    "برنامه مربوطه روی گوشی پیدا نشد",
+                    Toast.LENGTH_SHORT
+            ).show();
+        }
+    }
 
-            exit 1
-          fi
+    private void openUrl(String url) {
 
-          echo "======================================"
-          echo "APK FOUND"
-          echo "======================================"
+        if (url == null || url.trim().isEmpty()) {
+            return;
+        }
 
-          echo "$APK_FILE"
+        try {
 
-          mkdir -p "$GITHUB_WORKSPACE/apk-output"
+            Intent intent =
+                    new Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse(url)
+                    );
 
-          cp "$APK_FILE" \
-            "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v5-debug.apk"
+            startActivity(intent);
 
-          echo ""
-          echo "Final APK:"
-          ls -lh \
-            "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v5-debug.apk"
+        } catch (Exception e) {
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: hm-studio-app-v5-debug
-          path: apk-output/hm-studio-app-v5-debug.apk
-          if-no-files-found: error
+            Toast.makeText(
+                    this,
+                    "امکان باز کردن لینک وجود ندارد",
+                    Toast.LENGTH_SHORT
+            ).show();
+        }
+    }
+
+    private void makeCall(String phone) {
+
+        if (phone == null || phone.trim().isEmpty()) {
+            return;
+        }
+
+        String cleanPhone =
+                phone.replace(" ", "")
+                        .replace("-", "");
+
+        try {
+
+            Intent intent = new Intent(
+                    Intent.ACTION_DIAL,
+                    Uri.parse("tel:" + cleanPhone)
+            );
+
+            startActivity(intent);
+
+        } catch (Exception e) {
+
+            Toast.makeText(
+                    this,
+                    "امکان برقراری تماس وجود ندارد",
+                    Toast.LENGTH_SHORT
+            ).show();
+        }
+    }
+
+    private void sendSms(String phone, String message) {
+
+        if (phone == null) {
+            phone = "";
+        }
+
+        if (message == null) {
+            message = "";
+        }
+
+        try {
+
+            Intent intent = new Intent(
+                    Intent.ACTION_SENDTO
+            );
+
+            intent.setData(
+                    Uri.parse(
+                            "smsto:" +
+                                    Uri.encode(phone)
+                    )
+            );
+
+            intent.putExtra(
+                    "sms_body",
+                    message
+            );
+
+            startActivity(intent);
+
+        } catch (Exception e) {
+
+            Toast.makeText(
+                    this,
+                    "برنامه پیامک پیدا نشد",
+                    Toast.LENGTH_SHORT
+            ).show();
+        }
+    }
+
+    private void sendEmail(
+            String email,
+            String subject,
+            String body) {
+
+        if (email == null ||
+                email.trim().isEmpty()) {
+
+            Toast.makeText(
+                    this,
+                    "آدرس ایمیل وارد نشده است",
+                    Toast.LENGTH_SHORT
+            ).show();
+
+            return;
+        }
+
+        try {
+
+            Intent intent =
+                    new Intent(Intent.ACTION_SENDTO);
+
+            intent.setData(
+                    Uri.parse(
+                            "mailto:" +
+                                    Uri.encode(email)
+                    )
+            );
+
+            intent.putExtra(
+                    Intent.EXTRA_SUBJECT,
+                    subject == null ? "" : subject
+            );
+
+            intent.putExtra(
+                    Intent.EXTRA_TEXT,
+                    body == null ? "" : body
+            );
+
+            startActivity(intent);
+
+        } catch (Exception e) {
+
+            Toast.makeText(
+                    this,
+                    "برنامه ایمیل پیدا نشد",
+                    Toast.LENGTH_SHORT
+            ).show();
+        }
+    }
+
+    private void openWhatsApp(
+            String phone,
+            String message) {
+
+        if (phone == null) {
+            phone = "";
+        }
+
+        if (message == null) {
+            message = "";
+        }
+
+        String cleanPhone =
+                phone.replace("+", "")
+                        .replace(" ", "")
+                        .replace("-", "")
+                        .replace("(", "")
+                        .replace(")", "");
+
+        String url =
+                "https://wa.me/" +
+                        cleanPhone +
+                        "?text=" +
+                        Uri.encode(message);
+
+        try {
+
+            Intent intent =
+                    new Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse(url)
+                    );
+
+            startActivity(intent);
+
+        } catch (Exception e) {
+
+            Toast.makeText(
+                    this,
+                    "WhatsApp روی گوشی پیدا نشد",
+                    Toast.LENGTH_SHORT
+            ).show();
+        }
+    }
+
+    private void openTelegram(
+            String username,
+            String message) {
+
+        if (username == null) {
+            username = "";
+        }
+
+        username =
+                username.replace("@", "");
+
+        String url =
+                "https://t.me/" +
+                        username;
+
+        if (message != null &&
+                !message.trim().isEmpty()) {
+
+            url +=
+                    "?text=" +
+                            Uri.encode(message);
+        }
+
+        openUrl(url);
+    }
+
+    private void openMap(
+            String latitude,
+            String longitude,
+            String label) {
+
+        try {
+
+            String uri =
+                    "geo:" +
+                            latitude +
+                            "," +
+                            longitude +
+                            "?q=" +
+                            latitude +
+                            "," +
+                            longitude +
+                            "(" +
+                            Uri.encode(
+                                    label == null
+                                            ? "HM Studio"
+                                            : label
+                            ) +
+                            ")";
+
+            Intent intent =
+                    new Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse(uri)
+                    );
+
+            startActivity(intent);
+
+        } catch (Exception e) {
+
+            Toast.makeText(
+                    this,
+                    "نقشه روی گوشی پیدا نشد",
+                    Toast.LENGTH_SHORT
+            ).show();
+        }
+    }
+
+    private void injectNavigationFixes() {
+
+        if (webView == null) {
+            return;
+        }
+
+        String script =
+                "(function() {" +
+
+                        "try {" +
+
+                        "document.documentElement.style.setProperty(" +
+                        "'--android-safe-bottom'," +
+                        "'env(safe-area-inset-bottom, 0px)'"+
+                        ");" +
+
+                        "var style = document.getElementById(" +
+                        "'android-navigation-fix');" +
+
+                        "if (!style) {" +
+
+                        "style = document.createElement('style');" +
+
+                        "style.id = 'android-navigation-fix';" +
+
+                        "style.innerHTML = `" +
+
+                        "html,body{" +
+                        "margin:0!important;" +
+                        "padding:0!important;" +
+                        "width:100%!important;" +
+                        "min-height:100%!important;" +
+                        "overflow-x:hidden!important;" +
+                        "}" +
+
+                        "body{" +
+                        "padding-bottom:" +
+                        "calc(82px + env(safe-area-inset-bottom,0px))" +
+                        "!important;" +
+                        "}" +
+
+                        "header," +
+                        ".header," +
+                        ".top-bar," +
+                        ".glass-header," +
+                        "[data-header]," +
+                        ".navbar{" +
+                        "position:sticky!important;" +
+                        "position:-webkit-sticky!important;" +
+                        "top:0!important;" +
+                        "z-index:9990!important;" +
+                        "}" +
+
+                        "nav," +
+                        ".bottom-nav," +
+                        ".bottom-navigation," +
+                        ".mobile-nav," +
+                        ".glass-nav," +
+                        "[data-bottom-nav]{" +
+                        "position:fixed!important;" +
+                        "left:0!important;" +
+                        "right:0!important;" +
+                        "bottom:0!important;" +
+                        "width:100%!important;" +
+                        "z-index:10000!important;" +
+                        "box-sizing:border-box!important;" +
+                        "padding-bottom:" +
+                        "env(safe-area-inset-bottom,0px)" +
+                        "!important;" +
+                        "}" +
+
+                        ".bottom-nav > *," +
+                        ".bottom-navigation > *," +
+                        ".mobile-nav > *," +
+                        "[data-bottom-nav] > *{" +
+                        "min-width:0!important;" +
+                        "box-sizing:border-box!important;" +
+                        "}" +
+
+                        "button,a{" +
+                        "touch-action:manipulation;" +
+                        "}" +
+
+                        "img,video,iframe{" +
+                        "max-width:100%;" +
+                        "}" +
+
+                        "`;" +
+
+                        "document.head.appendChild(style);" +
+
+                        "}" +
+
+                        "var nodes = document.querySelectorAll(" +
+                        "[data-nav], [data-i18n], " +
+                        ".bottom-nav a, " +
+                        ".bottom-navigation a, " +
+                        ".mobile-nav a, " +
+                        "[data-bottom-nav] a" +
+                        ");" +
+
+                        "nodes.forEach(function(el) {" +
+
+                        "el.style.pointerEvents = 'auto';" +
+
+                        "});" +
+
+                        "} catch(e) {}" +
+
+                        "})();";
+
+        webView.evaluateJavascript(
+                script,
+                null
+        );
+    }
+
+    @Override
+    public void onBackPressed() {
+
+        if (webView == null) {
+            super.onBackPressed();
+            return;
+        }
+
+        webView.evaluateJavascript(
+                "(function(){" +
+                        "try{" +
+
+                        "var selectors=[" +
+                        "'.modal.open'," +
+                        "'.modal.show'," +
+                        "'.modal.active'," +
+                        "'.overlay.active'," +
+                        "'.video-modal'," +
+                        "'.video-overlay'," +
+                        "'.menu.open'," +
+                        "'.mobile-menu.open'," +
+                        "'.hamburger-menu.open'" +
+                        "];" +
+
+                        "for(var i=0;i<selectors.length;i++){" +
+
+                        "var els=document.querySelectorAll(" +
+                        "selectors[i]" +
+                        ");" +
+
+                        "for(var j=0;j<els.length;j++){" +
+
+                        "els[j].classList.remove(" +
+                        "'open','show','active'" +
+                        ");" +
+
+                        "els[j].style.display='none';" +
+
+                        "}" +
+
+                        "}" +
+
+                        "var videos=document.querySelectorAll(" +
+                        "'.video-modal video," +
+                        "video'" +
+                        ");" +
+
+                        "for(var k=0;k<videos.length;k++){" +
+
+                        "try{" +
+                        "videos[k].pause();" +
+                        "}catch(e){}" +
+
+                        "}" +
+
+                        "}catch(e){}" +
+
+                        "return true;" +
+
+                        "})()",
+
+                value -> {
+
+                    if (value == null ||
+                            value.equals("true") ||
+                            value.equals("\"true\"")) {
+
+                        return;
+                    }
+
+                    if (webView.canGoBack()) {
+                        webView.goBack();
+                    } else {
+                        superOnBackPressed();
+                    }
+                }
+        );
+    }
+
+    private void superOnBackPressed() {
+
+        super.onBackPressed();
+    }
+
+    public class AndroidBridge {
+
+        @JavascriptInterface
+        public void call(String phone) {
+
+            runOnUiThread(
+                    () -> makeCall(phone)
+            );
+        }
+
+        @JavascriptInterface
+        public void sms(
+                String phone,
+                String message) {
+
+            runOnUiThread(
+                    () -> sendSms(
+                            phone,
+                            message
+                    )
+            );
+        }
+
+        @JavascriptInterface
+        public void email(
+                String email,
+                String subject,
+                String body) {
+
+            runOnUiThread(
+                    () -> sendEmail(
+                            email,
+                            subject,
+                            body
+                    )
+            );
+        }
+
+        @JavascriptInterface
+        public void whatsapp(
+                String phone,
+                String message) {
+
+            runOnUiThread(
+                    () -> openWhatsApp(
+                            phone,
+                            message
+                    )
+            );
+        }
+
+        @JavascriptInterface
+        public void telegram(
+                String username,
+                String message) {
+
+            runOnUiThread(
+                    () -> openTelegram(
+                            username,
+                            message
+                    )
+            );
+        }
+
+        @JavascriptInterface
+        public void map(
+                String latitude,
+                String longitude,
+                String label) {
+
+            runOnUiThread(
+                    () -> openMap(
+                            latitude,
+                            longitude,
+                            label
+                    )
+            );
+        }
+
+        @JavascriptInterface
+        public void open(
+                String url) {
+
+            runOnUiThread(
+                    () -> openUrl(url)
+            );
+        }
+
+        @JavascriptInterface
+        public void languageChanged(
+                String language) {
+
+            runOnUiThread(
+                    () -> applyAndroidLanguage(
+                            language
+                    )
+            );
+        }
+
+        @JavascriptInterface
+        public void setLanguage(
+                String language) {
+
+            runOnUiThread(
+                    () -> applyAndroidLanguage(
+                            language
+                    )
+            );
+        }
+
+        @JavascriptInterface
+        public void toast(
+                String message) {
+
+            runOnUiThread(
+                    () -> Toast.makeText(
+                            MainActivity.this,
+                            message == null
+                                    ? ""
+                                    : message,
+                            Toast.LENGTH_SHORT
+                    ).show()
+            );
+        }
+
+        @JavascriptInterface
+        public void openSettings() {
+
+            runOnUiThread(() -> {
+
+                try {
+
+                    Intent intent =
+                            new Intent(
+                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                            );
+
+                    intent.setData(
+                            Uri.parse(
+                                    "package:" +
+                                            getPackageName()
+                            )
+                    );
+
+                    startActivity(intent);
+
+                } catch (Exception ignored) {
+                }
+            });
+        }
+    }
+
+    private void applyAndroidLanguage(
+            String language) {
+
+        if (language == null) {
+            return;
+        }
+
+        String lang =
+                language.toLowerCase(
+                        Locale.ROOT
+                );
+
+        if (lang.startsWith("fa")) {
+
+            getResources()
+                    .getConfiguration()
+                    .setLocale(
+                            new Locale("fa")
+                    );
+
+        } else if (lang.startsWith("ar")) {
+
+            getResources()
+                    .getConfiguration()
+                    .setLocale(
+                            new Locale("ar")
+                    );
+
+        } else {
+
+            getResources()
+                    .getConfiguration()
+                    .setLocale(
+                            Locale.ENGLISH
+                    );
+        }
+
+        String direction =
+                lang.startsWith("en")
+                        ? "ltr"
+                        : "rtl";
+
+        String script =
+                "(function(){" +
+
+                        "try{" +
+
+                        "document.documentElement.lang='" +
+                        escapeJs(lang) +
+                        "';" +
+
+                        "document.documentElement.dir='" +
+                        direction +
+                        "';" +
+
+                        "document.body.dir='" +
+                        direction +
+                        "';" +
+
+                        "var bottom=document.querySelectorAll(" +
+                        "'.bottom-nav a," +
+                        ".bottom-navigation a," +
+                        ".mobile-nav a," +
+                        "[data-bottom-nav] a'" +
+                        ");" +
+
+                        "bottom.forEach(function(el){" +
+                        "el.style.direction='" +
+                        direction +
+                        "';" +
+                        "el.style.textAlign='center';" +
+                        "});" +
+
+                        "}catch(e){}" +
+
+                        "})()";
+
+        webView.evaluateJavascript(
+                script,
+                null
+        );
+    }
+
+    private String escapeJs(String value) {
+
+        if (value == null) {
+            return "";
+        }
+
+        return value
+                .replace("\\", "\\\\")
+                .replace("'", "\\'");
+    }
+
+    @Override
+    protected void onResume() {
+
+        super.onResume();
+
+        if (webView != null) {
+
+            webView.onResume();
+
+            webView.evaluateJavascript(
+                    "(function(){" +
+                            "try{" +
+                            "if(window.applyLanguage){" +
+                            "window.applyLanguage(" +
+                            "localStorage.getItem('language') || " +
+                            "localStorage.getItem('lang') || " +
+                            "'fa'" +
+                            ");" +
+                            "}" +
+                            "}catch(e){}" +
+                            "})()",
+                    null
+            );
+        }
+    }
+
+    @Override
+    protected void onPause() {
+
+        if (webView != null) {
+            webView.onPause();
+        }
+
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+
+        if (webView != null) {
+
+            webView.stopLoading();
+
+            webView.loadUrl("about:blank");
+
+            webView.clearHistory();
+
+            webView.removeAllViews();
+
+            webView.destroy();
+        }
+
+        super.onDestroy();
+    }
+}
