@@ -1,997 +1,183 @@
-package com.hmstudio.app;
-
-import android.Manifest;
-import android.annotation.SuppressLint;
-import android.app.Activity;
-import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
-import android.net.Uri;
-import android.os.Build;
-import android.os.Bundle;
-import android.provider.Settings;
-import android.view.Gravity;
-import android.view.View;
-import android.view.Window;
-import android.view.WindowInsets;
-import android.view.WindowInsetsController;
-import android.webkit.JavascriptInterface;
-import android.webkit.WebChromeClient;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
-import android.widget.FrameLayout;
-import android.widget.Toast;
-
-import java.util.Locale;
-
-public class MainActivity extends Activity {
-
-    private WebView webView;
-    private FrameLayout root;
-    private View loadingView;
-
-    private static final int COLOR_BG = Color.rgb(10, 10, 12);
-
-    private static final String HOME_URL =
-            "file:///android_asset/index.html";
-
-    @SuppressLint("SetJavaScriptEnabled")
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        configureWindow();
-
-        root = new FrameLayout(this);
-        root.setBackgroundColor(COLOR_BG);
-
-        webView = new WebView(this);
-        webView.setBackgroundColor(COLOR_BG);
-
-        FrameLayout.LayoutParams webParams =
-                new FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.MATCH_PARENT
-                );
-
-        root.addView(webView, webParams);
-
-        setContentView(root);
-
-        configureWebView();
-        configureJavascriptBridge();
-
-        webView.loadUrl(HOME_URL);
-    }
-
-    private void configureWindow() {
-        Window window = getWindow();
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            window.setStatusBarColor(Color.rgb(8, 8, 10));
-            window.setNavigationBarColor(Color.rgb(8, 8, 10));
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            WindowInsetsController controller =
-                    window.getInsetsController();
-
-            if (controller != null) {
-                controller.setSystemBarsBehavior(
-                        WindowInsetsController.BEHAVIOR_DEFAULT
-                );
-            }
-        }
-    }
-
-    @SuppressLint("SetJavaScriptEnabled")
-    private void configureWebView() {
-
-        WebSettings settings = webView.getSettings();
-
-        settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(true);
-        settings.setDatabaseEnabled(true);
-        settings.setAllowFileAccess(true);
-        settings.setAllowContentAccess(true);
-        settings.setMediaPlaybackRequiresUserGesture(false);
-        settings.setBuiltInZoomControls(false);
-        settings.setDisplayZoomControls(false);
-        settings.setSupportZoom(false);
-        settings.setLoadWithOverviewMode(false);
-        settings.setUseWideViewPort(false);
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            settings.setMixedContentMode(
-                    WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-            );
-        }
-
-        webView.setVerticalScrollBarEnabled(false);
-        webView.setHorizontalScrollBarEnabled(false);
-        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-
-        webView.setWebChromeClient(new WebChromeClient());
-
-        webView.setWebViewClient(new WebViewClient() {
-
-            @Override
-            public boolean shouldOverrideUrlLoading(
-                    WebView view,
-                    WebResourceRequest request) {
-
-                if (request == null || request.getUrl() == null) {
-                    return false;
-                }
-
-                String url = request.getUrl().toString();
-
-                if (url.startsWith("http://") ||
-                        url.startsWith("https://")) {
-
-                    Intent intent = new Intent(
-                            Intent.ACTION_VIEW,
-                            Uri.parse(url)
-                    );
-
-                    try {
-                        startActivity(intent);
-                        return true;
-                    } catch (Exception ignored) {
-                        return false;
-                    }
-                }
-
-                if (url.startsWith("tel:") ||
-                        url.startsWith("sms:") ||
-                        url.startsWith("mailto:") ||
-                        url.startsWith("geo:") ||
-                        url.startsWith("whatsapp:") ||
-                        url.startsWith("tg:")) {
-
-                    openExternalUrl(url);
-                    return true;
-                }
-
-                return false;
-            }
-
-            @Override
-            public boolean shouldOverrideUrlLoading(
-                    WebView view,
-                    String url) {
-
-                if (url == null) {
-                    return false;
-                }
-
-                if (url.startsWith("http://") ||
-                        url.startsWith("https://") ||
-                        url.startsWith("tel:") ||
-                        url.startsWith("sms:") ||
-                        url.startsWith("mailto:") ||
-                        url.startsWith("geo:") ||
-                        url.startsWith("whatsapp:") ||
-                        url.startsWith("tg:")) {
-
-                    openExternalUrl(url);
-                    return true;
-                }
-
-                return false;
-            }
-
-            @Override
-            public void onPageFinished(
-                    WebView view,
-                    String url) {
-
-                super.onPageFinished(view, url);
-
-                injectNavigationFixes();
-
-                webView.postDelayed(
-                        MainActivity.this::injectNavigationFixes,
-                        300
-                );
-
-                webView.postDelayed(
-                        MainActivity.this::injectNavigationFixes,
-                        1000
-                );
-            }
-        });
-    }
-
-    private void configureJavascriptBridge() {
-
-        webView.addJavascriptInterface(
-                new AndroidBridge(),
-                "Android"
-        );
-    }
-
-    private void openExternalUrl(String url) {
-
-        try {
-            Intent intent = new Intent(
-                    Intent.ACTION_VIEW,
-                    Uri.parse(url)
-            );
-
-            startActivity(intent);
-
-        } catch (Exception e) {
-
-            Toast.makeText(
-                    this,
-                    "برنامه مربوطه روی گوشی پیدا نشد",
-                    Toast.LENGTH_SHORT
-            ).show();
-        }
-    }
-
-    private void openUrl(String url) {
-
-        if (url == null || url.trim().isEmpty()) {
-            return;
-        }
-
-        try {
-
-            Intent intent =
-                    new Intent(
-                            Intent.ACTION_VIEW,
-                            Uri.parse(url)
-                    );
-
-            startActivity(intent);
-
-        } catch (Exception e) {
-
-            Toast.makeText(
-                    this,
-                    "امکان باز کردن لینک وجود ندارد",
-                    Toast.LENGTH_SHORT
-            ).show();
-        }
-    }
-
-    private void makeCall(String phone) {
-
-        if (phone == null || phone.trim().isEmpty()) {
-            return;
-        }
-
-        String cleanPhone =
-                phone.replace(" ", "")
-                        .replace("-", "");
-
-        try {
-
-            Intent intent = new Intent(
-                    Intent.ACTION_DIAL,
-                    Uri.parse("tel:" + cleanPhone)
-            );
-
-            startActivity(intent);
-
-        } catch (Exception e) {
-
-            Toast.makeText(
-                    this,
-                    "امکان برقراری تماس وجود ندارد",
-                    Toast.LENGTH_SHORT
-            ).show();
-        }
-    }
-
-    private void sendSms(String phone, String message) {
-
-        if (phone == null) {
-            phone = "";
-        }
-
-        if (message == null) {
-            message = "";
-        }
-
-        try {
-
-            Intent intent = new Intent(
-                    Intent.ACTION_SENDTO
-            );
-
-            intent.setData(
-                    Uri.parse(
-                            "smsto:" +
-                                    Uri.encode(phone)
-                    )
-            );
-
-            intent.putExtra(
-                    "sms_body",
-                    message
-            );
-
-            startActivity(intent);
-
-        } catch (Exception e) {
-
-            Toast.makeText(
-                    this,
-                    "برنامه پیامک پیدا نشد",
-                    Toast.LENGTH_SHORT
-            ).show();
-        }
-    }
-
-    private void sendEmail(
-            String email,
-            String subject,
-            String body) {
-
-        if (email == null ||
-                email.trim().isEmpty()) {
-
-            Toast.makeText(
-                    this,
-                    "آدرس ایمیل وارد نشده است",
-                    Toast.LENGTH_SHORT
-            ).show();
-
-            return;
-        }
-
-        try {
-
-            Intent intent =
-                    new Intent(Intent.ACTION_SENDTO);
-
-            intent.setData(
-                    Uri.parse(
-                            "mailto:" +
-                                    Uri.encode(email)
-                    )
-            );
-
-            intent.putExtra(
-                    Intent.EXTRA_SUBJECT,
-                    subject == null ? "" : subject
-            );
-
-            intent.putExtra(
-                    Intent.EXTRA_TEXT,
-                    body == null ? "" : body
-            );
-
-            startActivity(intent);
-
-        } catch (Exception e) {
-
-            Toast.makeText(
-                    this,
-                    "برنامه ایمیل پیدا نشد",
-                    Toast.LENGTH_SHORT
-            ).show();
-        }
-    }
-
-    private void openWhatsApp(
-            String phone,
-            String message) {
-
-        if (phone == null) {
-            phone = "";
-        }
-
-        if (message == null) {
-            message = "";
-        }
-
-        String cleanPhone =
-                phone.replace("+", "")
-                        .replace(" ", "")
-                        .replace("-", "")
-                        .replace("(", "")
-                        .replace(")", "");
-
-        String url =
-                "https://wa.me/" +
-                        cleanPhone +
-                        "?text=" +
-                        Uri.encode(message);
-
-        try {
-
-            Intent intent =
-                    new Intent(
-                            Intent.ACTION_VIEW,
-                            Uri.parse(url)
-                    );
-
-            startActivity(intent);
-
-        } catch (Exception e) {
-
-            Toast.makeText(
-                    this,
-                    "WhatsApp روی گوشی پیدا نشد",
-                    Toast.LENGTH_SHORT
-            ).show();
-        }
-    }
-
-    private void openTelegram(
-            String username,
-            String message) {
-
-        if (username == null) {
-            username = "";
-        }
-
-        username =
-                username.replace("@", "");
-
-        String url =
-                "https://t.me/" +
-                        username;
-
-        if (message != null &&
-                !message.trim().isEmpty()) {
-
-            url +=
-                    "?text=" +
-                            Uri.encode(message);
-        }
-
-        openUrl(url);
-    }
-
-    private void openMap(
-            String latitude,
-            String longitude,
-            String label) {
-
-        try {
-
-            String uri =
-                    "geo:" +
-                            latitude +
-                            "," +
-                            longitude +
-                            "?q=" +
-                            latitude +
-                            "," +
-                            longitude +
-                            "(" +
-                            Uri.encode(
-                                    label == null
-                                            ? "HM Studio"
-                                            : label
-                            ) +
-                            ")";
-
-            Intent intent =
-                    new Intent(
-                            Intent.ACTION_VIEW,
-                            Uri.parse(uri)
-                    );
-
-            startActivity(intent);
-
-        } catch (Exception e) {
-
-            Toast.makeText(
-                    this,
-                    "نقشه روی گوشی پیدا نشد",
-                    Toast.LENGTH_SHORT
-            ).show();
-        }
-    }
-
-    private void injectNavigationFixes() {
-
-        if (webView == null) {
-            return;
-        }
-
-        String script =
-                "(function() {" +
-
-                        "try {" +
-
-                        "document.documentElement.style.setProperty(" +
-                        "'--android-safe-bottom'," +
-                        "'env(safe-area-inset-bottom, 0px)'"+
-                        ");" +
-
-                        "var style = document.getElementById(" +
-                        "'android-navigation-fix');" +
-
-                        "if (!style) {" +
-
-                        "style = document.createElement('style');" +
-
-                        "style.id = 'android-navigation-fix';" +
-
-                        "style.innerHTML = `" +
-
-                        "html,body{" +
-                        "margin:0!important;" +
-                        "padding:0!important;" +
-                        "width:100%!important;" +
-                        "min-height:100%!important;" +
-                        "overflow-x:hidden!important;" +
-                        "}" +
-
-                        "body{" +
-                        "padding-bottom:" +
-                        "calc(82px + env(safe-area-inset-bottom,0px))" +
-                        "!important;" +
-                        "}" +
-
-                        "header," +
-                        ".header," +
-                        ".top-bar," +
-                        ".glass-header," +
-                        "[data-header]," +
-                        ".navbar{" +
-                        "position:sticky!important;" +
-                        "position:-webkit-sticky!important;" +
-                        "top:0!important;" +
-                        "z-index:9990!important;" +
-                        "}" +
-
-                        "nav," +
-                        ".bottom-nav," +
-                        ".bottom-navigation," +
-                        ".mobile-nav," +
-                        ".glass-nav," +
-                        "[data-bottom-nav]{" +
-                        "position:fixed!important;" +
-                        "left:0!important;" +
-                        "right:0!important;" +
-                        "bottom:0!important;" +
-                        "width:100%!important;" +
-                        "z-index:10000!important;" +
-                        "box-sizing:border-box!important;" +
-                        "padding-bottom:" +
-                        "env(safe-area-inset-bottom,0px)" +
-                        "!important;" +
-                        "}" +
-
-                        ".bottom-nav > *," +
-                        ".bottom-navigation > *," +
-                        ".mobile-nav > *," +
-                        "[data-bottom-nav] > *{" +
-                        "min-width:0!important;" +
-                        "box-sizing:border-box!important;" +
-                        "}" +
-
-                        "button,a{" +
-                        "touch-action:manipulation;" +
-                        "}" +
-
-                        "img,video,iframe{" +
-                        "max-width:100%;" +
-                        "}" +
-
-                        "`;" +
-
-                        "document.head.appendChild(style);" +
-
-                        "}" +
-
-                        "var nodes = document.querySelectorAll(" +
-                        "[data-nav], [data-i18n], " +
-                        ".bottom-nav a, " +
-                        ".bottom-navigation a, " +
-                        ".mobile-nav a, " +
-                        "[data-bottom-nav] a" +
-                        ");" +
-
-                        "nodes.forEach(function(el) {" +
-
-                        "el.style.pointerEvents = 'auto';" +
-
-                        "});" +
-
-                        "} catch(e) {}" +
-
-                        "})();";
-
-        webView.evaluateJavascript(
-                script,
-                null
-        );
-    }
-
-    @Override
-    public void onBackPressed() {
-
-        if (webView == null) {
-            super.onBackPressed();
-            return;
-        }
-
-        webView.evaluateJavascript(
-                "(function(){" +
-                        "try{" +
-
-                        "var selectors=[" +
-                        "'.modal.open'," +
-                        "'.modal.show'," +
-                        "'.modal.active'," +
-                        "'.overlay.active'," +
-                        "'.video-modal'," +
-                        "'.video-overlay'," +
-                        "'.menu.open'," +
-                        "'.mobile-menu.open'," +
-                        "'.hamburger-menu.open'" +
-                        "];" +
-
-                        "for(var i=0;i<selectors.length;i++){" +
-
-                        "var els=document.querySelectorAll(" +
-                        "selectors[i]" +
-                        ");" +
-
-                        "for(var j=0;j<els.length;j++){" +
-
-                        "els[j].classList.remove(" +
-                        "'open','show','active'" +
-                        ");" +
-
-                        "els[j].style.display='none';" +
-
-                        "}" +
-
-                        "}" +
-
-                        "var videos=document.querySelectorAll(" +
-                        "'.video-modal video," +
-                        "video'" +
-                        ");" +
-
-                        "for(var k=0;k<videos.length;k++){" +
-
-                        "try{" +
-                        "videos[k].pause();" +
-                        "}catch(e){}" +
-
-                        "}" +
-
-                        "}catch(e){}" +
-
-                        "return true;" +
-
-                        "})()",
-
-                value -> {
-
-                    if (value == null ||
-                            value.equals("true") ||
-                            value.equals("\"true\"")) {
-
-                        return;
-                    }
-
-                    if (webView.canGoBack()) {
-                        webView.goBack();
-                    } else {
-                        superOnBackPressed();
-                    }
-                }
-        );
-    }
-
-    private void superOnBackPressed() {
-
-        super.onBackPressed();
-    }
-
-    public class AndroidBridge {
-
-        @JavascriptInterface
-        public void call(String phone) {
-
-            runOnUiThread(
-                    () -> makeCall(phone)
-            );
-        }
-
-        @JavascriptInterface
-        public void sms(
-                String phone,
-                String message) {
-
-            runOnUiThread(
-                    () -> sendSms(
-                            phone,
-                            message
-                    )
-            );
-        }
-
-        @JavascriptInterface
-        public void email(
-                String email,
-                String subject,
-                String body) {
-
-            runOnUiThread(
-                    () -> sendEmail(
-                            email,
-                            subject,
-                            body
-                    )
-            );
-        }
-
-        @JavascriptInterface
-        public void whatsapp(
-                String phone,
-                String message) {
-
-            runOnUiThread(
-                    () -> openWhatsApp(
-                            phone,
-                            message
-                    )
-            );
-        }
-
-        @JavascriptInterface
-        public void telegram(
-                String username,
-                String message) {
-
-            runOnUiThread(
-                    () -> openTelegram(
-                            username,
-                            message
-                    )
-            );
-        }
-
-        @JavascriptInterface
-        public void map(
-                String latitude,
-                String longitude,
-                String label) {
-
-            runOnUiThread(
-                    () -> openMap(
-                            latitude,
-                            longitude,
-                            label
-                    )
-            );
-        }
-
-        @JavascriptInterface
-        public void open(
-                String url) {
-
-            runOnUiThread(
-                    () -> openUrl(url)
-            );
-        }
-
-        @JavascriptInterface
-        public void languageChanged(
-                String language) {
-
-            runOnUiThread(
-                    () -> applyAndroidLanguage(
-                            language
-                    )
-            );
-        }
-
-        @JavascriptInterface
-        public void setLanguage(
-                String language) {
-
-            runOnUiThread(
-                    () -> applyAndroidLanguage(
-                            language
-                    )
-            );
-        }
-
-        @JavascriptInterface
-        public void toast(
-                String message) {
-
-            runOnUiThread(
-                    () -> Toast.makeText(
-                            MainActivity.this,
-                            message == null
-                                    ? ""
-                                    : message,
-                            Toast.LENGTH_SHORT
-                    ).show()
-            );
-        }
-
-        @JavascriptInterface
-        public void openSettings() {
-
-            runOnUiThread(() -> {
-
-                try {
-
-                    Intent intent =
-                            new Intent(
-                                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS
-                            );
-
-                    intent.setData(
-                            Uri.parse(
-                                    "package:" +
-                                            getPackageName()
-                            )
-                    );
-
-                    startActivity(intent);
-
-                } catch (Exception ignored) {
-                }
-            });
-        }
-    }
-
-    private void applyAndroidLanguage(
-            String language) {
-
-        if (language == null) {
-            return;
-        }
-
-        String lang =
-                language.toLowerCase(
-                        Locale.ROOT
-                );
-
-        if (lang.startsWith("fa")) {
-
-            getResources()
-                    .getConfiguration()
-                    .setLocale(
-                            new Locale("fa")
-                    );
-
-        } else if (lang.startsWith("ar")) {
-
-            getResources()
-                    .getConfiguration()
-                    .setLocale(
-                            new Locale("ar")
-                    );
-
-        } else {
-
-            getResources()
-                    .getConfiguration()
-                    .setLocale(
-                            Locale.ENGLISH
-                    );
-        }
-
-        String direction =
-                lang.startsWith("en")
-                        ? "ltr"
-                        : "rtl";
-
-        String script =
-                "(function(){" +
-
-                        "try{" +
-
-                        "document.documentElement.lang='" +
-                        escapeJs(lang) +
-                        "';" +
-
-                        "document.documentElement.dir='" +
-                        direction +
-                        "';" +
-
-                        "document.body.dir='" +
-                        direction +
-                        "';" +
-
-                        "var bottom=document.querySelectorAll(" +
-                        "'.bottom-nav a," +
-                        ".bottom-navigation a," +
-                        ".mobile-nav a," +
-                        "[data-bottom-nav] a'" +
-                        ");" +
-
-                        "bottom.forEach(function(el){" +
-                        "el.style.direction='" +
-                        direction +
-                        "';" +
-                        "el.style.textAlign='center';" +
-                        "});" +
-
-                        "}catch(e){}" +
-
-                        "})()";
-
-        webView.evaluateJavascript(
-                script,
-                null
-        );
-    }
-
-    private String escapeJs(String value) {
-
-        if (value == null) {
-            return "";
-        }
-
-        return value
-                .replace("\\", "\\\\")
-                .replace("'", "\\'");
-    }
-
-    @Override
-    protected void onResume() {
-
-        super.onResume();
-
-        if (webView != null) {
-
-            webView.onResume();
-
-            webView.evaluateJavascript(
-                    "(function(){" +
-                            "try{" +
-                            "if(window.applyLanguage){" +
-                            "window.applyLanguage(" +
-                            "localStorage.getItem('language') || " +
-                            "localStorage.getItem('lang') || " +
-                            "'fa'" +
-                            ");" +
-                            "}" +
-                            "}catch(e){}" +
-                            "})()",
-                    null
-            );
-        }
-    }
-
-    @Override
-    protected void onPause() {
-
-        if (webView != null) {
-            webView.onPause();
-        }
-
-        super.onPause();
-    }
-
-    @Override
-    protected void onDestroy() {
-
-        if (webView != null) {
-
-            webView.stopLoading();
-
-            webView.loadUrl("about:blank");
-
-            webView.clearHistory();
-
-            webView.removeAllViews();
-
-            webView.destroy();
-        }
-
-        super.onDestroy();
-    }
-}
+name: Build HM Studio APK V6
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build HM Studio APK V6
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Find V6 ZIP
+        shell: bash
+        run: |
+          set -e
+
+          echo "======================================"
+          echo "FINDING V6 PROJECT ZIP"
+          echo "======================================"
+
+          ZIP_FILE="hm-studio-app-v6-corrected.zip"
+
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "ERROR: $ZIP_FILE was not found."
+            echo ""
+            echo "ZIP files currently in repository:"
+            find . -maxdepth 1 -type f -name "*.zip" -print
+            exit 1
+          fi
+
+          echo "V6 ZIP found:"
+          ls -lh "$ZIP_FILE"
+
+          echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
+
+      - name: Extract V6 project
+        shell: bash
+        run: |
+          set -e
+
+          echo "======================================"
+          echo "EXTRACTING V6 PROJECT"
+          echo "======================================"
+
+          rm -rf extracted
+          mkdir -p extracted
+
+          unzip -q "$ZIP_FILE" -d extracted
+
+          echo ""
+          echo "Extracted files:"
+          find extracted -maxdepth 4 -type f -print | head -300
+
+      - name: Locate Android project
+        shell: bash
+        run: |
+          set -e
+
+          echo "======================================"
+          echo "LOCATING ANDROID PROJECT"
+          echo "======================================"
+
+          PROJECT_DIR=""
+
+          SETTINGS_FILE=$(find extracted -type f -name "settings.gradle" -print -quit || true)
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            SETTINGS_FILE=$(find extracted -type f -name "settings.gradle.kts" -print -quit || true)
+          fi
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "ERROR: settings.gradle was not found."
+            echo ""
+            echo "Available Gradle files:"
+            find extracted -type f \
+              \( -name "gradlew" -o -name "settings.gradle" -o -name "settings.gradle.kts" -o -name "build.gradle" -o -name "build.gradle.kts" \) \
+              -print
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+
+          echo "Android project:"
+          echo "$PROJECT_DIR"
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Prepare Gradle
+        shell: bash
+        run: |
+          set -e
+
+          cd "$PROJECT_DIR"
+
+          echo "======================================"
+          echo "PREPARING GRADLE"
+          echo "======================================"
+
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            echo "Gradle wrapper found."
+            ./gradlew --version
+          else
+            echo "Gradle wrapper not found."
+            echo "Using GitHub Actions Gradle installation."
+          fi
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Build Debug APK
+        shell: bash
+        run: |
+          set -e
+
+          cd "$PROJECT_DIR"
+
+          echo "======================================"
+          echo "BUILDING HM STUDIO APK"
+          echo "======================================"
+
+          if [ -f "./gradlew" ]; then
+            ./gradlew assembleDebug --no-daemon --stacktrace
+          else
+            gradle assembleDebug --no-daemon --stacktrace
+          fi
+
+      - name: Find APK
+        shell: bash
+        run: |
+          set -e
+
+          echo "======================================"
+          echo "SEARCHING FOR APK"
+          echo "======================================"
+
+          APK_FILE=$(find "$PROJECT_DIR" -type f -name "*.apk" -print -quit || true)
+
+          if [ -z "$APK_FILE" ]; then
+            echo "ERROR: APK was not generated."
+            echo ""
+            echo "Build output directories:"
+            find "$PROJECT_DIR" -type d -path "*/build/*" -print | head -200 || true
+            echo ""
+            echo "APK files:"
+            find "$PROJECT_DIR" -type f -name "*.apk" -print || true
+            exit 1
+          fi
+
+          echo "APK FOUND:"
+          echo "$APK_FILE"
+
+          mkdir -p "$GITHUB_WORKSPACE/apk-output"
+
+          cp "$APK_FILE" "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v6-debug.apk"
+
+          echo ""
+          echo "Final APK:"
+          ls -lh "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v6-debug.apk"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hm-studio-app-v6-debug
+          path: apk-output/hm-studio-app-v6-debug.apk
+          if-no-files-found: error
