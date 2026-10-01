@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -31,7 +32,7 @@ jobs:
           ZIP="$(find . -type f -name 'hm-studio-app-v6-corrected.zip' -print -quit)"
 
           if [ -z "$ZIP" ]; then
-            echo "ERROR: hm-studio-app-v6-corrected.zip NOT FOUND"
+            echo "ERROR: V6 ZIP NOT FOUND"
             exit 1
           fi
 
@@ -44,7 +45,6 @@ jobs:
 
           if [ -z "$PROJECT" ]; then
             echo "ERROR: settings.gradle NOT FOUND"
-            find v6-project -maxdepth 5 -type f | sort | head -100
             exit 1
           fi
 
@@ -65,44 +65,326 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Check project
+      - name: Check Android project
         shell: bash
         run: |
           set -e
 
           cd "$PROJECT"
 
-          echo "Gradle:"
-          gradle --version
-
-          echo "Android project:"
           test -f settings.gradle
           test -f app/build.gradle
           test -f app/src/main/AndroidManifest.xml
 
+          gradle --version
+
           echo "PROJECT CHECK OK"
 
-      - name: Create mobile stability JS
+      - name: Create stability JavaScript
         shell: bash
         run: |
           set -e
 
           mkdir -p "$PROJECT/app/src/main/assets/js"
 
-          echo 'KGZ1bmN0aW9uKCl7CiJ1c2Ugc3RyaWN0IjsKZnVuY3Rpb24gTCgpe3JldHVybiBkb2N1bWVudC5kb2N1bWVudEVsZW1lbnQubGFuZ3x8ImZhIn0KZnVuY3Rpb24gY2xvY2soKXsKIHZhciBuPW5ldyBEYXRlKCksbD1MKCkseD1sPT09ImZhIj8iZmEtSVItdS1jYS1wZXJzaWFuIjpsPT09ImFyIj8iYXItU0EtdS1jYS1pc2xhbWljIjoiZW4tVVMiOwogdmFyIHQ9bmV3IEludGwuRGF0ZVRpbWVGb3JtYXQoeCx7aG91cjoiMi1kaWdpdCIsbWludXRlOiIyLWRpZ2l0IixzZWNvbmQ6IjItZGlnaXQiLGhvdXIxMjpmYWxzZX0pLmZvcm1hdChuKTsKIHZhciBkPW5ldyBJbnRsLkRhdGVUaW1lRm9ybWF0KHgse2RheToibnVtZXJpYyIsbW9udGg6ImxvbmciLHllYXI6Im51bWVyaWMifSkuZm9ybWF0KG4pOwogIHZhciBlPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCJobVN0YWJsZUNsb2NrIik7CiBpZighZSl7ZT1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCJkaXYiKTtlLmlkPSJobVN0YWJsZUNsb2NrIjtlLmNsYXNzTmFtZT0iaG0tc3RhYmxlLWNsb2NrIjt8fChkb2N1bWVudC5xdWVyeVNlbGVjdG9yKCIuaGVybyIpfHxkb2N1bWVudC5xdWVyeVNlbGVjdG9yKCIuaHVkLWRlcHRoIil8fGRvY3VtZW50LmJvZHkpLmFwcGVuZENoaWxkKGUpfQogIGUudGV4dENvbnRlbnQ9dCsiIMK3ICIrZDt9CmZ1bmN0aW9uIGxheWVycygpe2RvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoIi5odWQtZGVwdGgsLnNjZW5lIC5zY3JlZW4sLnNjZW5lIC5nbGFzcy1jb25zb2xlLC5zY2VuZSAuZGVwdGgtbGF5ZXIsLnNjZW5lIC5ob2xvLWxheWVyIikuZm9yRWFjaChmdW5jdGlvbihlKXtlLmNsYXNzTGlzdC5hZGQoImhtLXN0YXRpYy1oaWRkZW4iKX0pfQpmdW5jdGlvbiBvcmRlcigpe3ZhciBmPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCJwcm9qZWN0Rm9ybSIpO2lmKCFmfHxmLmRhdGFzZXQuaG09PT0iMSIpcmV0dXJuO2YuZGF0YXNldC5obT0iMSI7Zi5hZGRFdmVudExpc3RlbmVyKCJzdWJtaXQiLGZ1bmN0aW9uKGV2KXtleXYucHJldmVudERlZmF1bHQoKTt2YXIgZD1PYmplY3QuZnJvbUVudHJpZXMobmV3IEZvcm1EYXRhKGYpLmVudHJpZXMoKSk7dmFyIG09WyJITSBTdHVkaW8gLSBQcm9qZWN0IFJlcXVlc3QiLCItLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLSIsIkZpcnN0IG5hbWU6ICIrKGQuZmlyc3ROYW1lfHxkLmZpcnN0bmFtZXx8IiIpLCJMYXN0IG5hbWU6ICIrKGQubGFzdE5hbWV8fGQubGFzdG5hbWV8fCIiKSwiRW1haWw6ICIrKGQuZW1haWx8fCIiKSwiUGhvbmU6ICIrKGQucGhvbmV8fCIiKSwiUHJvamVjdDogIisoZC5wcm9qZWN0VHlwZXx8ZC5wcm9qZWN0fHwiIiksIkJ1ZGdldDogIisoZC5idWRnZXR8fCIiKSwiTG9jYXRpb246ICIrKGQubG9jYXRpb258fCIiKSwiRGVzY3JpcHRpb246ICIrKGQuZGVzY3JpcHRpb258fCIiKV0uam9pbigiXG4iKTt2YXIgYT1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgiaG1PcmRlckFjdGlvbnMiKTtpZighYSl7YT1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCJkaXYiKTthLmlkPSJobU9yZGVyQWN0aW9ucyI7YS5jbGFzc05hbWU9ImhtLW9yZGVyLWFjdGlvbnMiO2YuYXBwZW5kQ2hpbGQoYSl9YS5pbm5lckhUTUw9IiI7dmFyIGw9TCgpLGxhYj1sPT09ImZhIj9bItmI2KfYqtiz2KfZviIsItm+24zYp9mF2qkiLCLYqtmE2q/Ysdin2YUiLCLYp9uM2YXbjNmEIl06bD09PSJhciI/WyLZiNin2KrYs9in2KgiLCJTTVMiLCLYqtmE2LrYsdin2YUiLCLYp9mE2KjYsdmK2K8iXTpbIldoYXRzQXBwIiwiU01TIiwiVGVsZWdyYW0iLCJFbWFpbCJdO3ZhciBwaG9uZT0iKzk4OTM5OTAyMDA5NCIsbWFpbD0ibTc0OTgxODE5QGdtYWlsLmNvbSI7ZnVuY3Rpb24gYih0LGZuKXt2YXIgeD1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCJidXR0b24iKTt4LnR5cGU9ImJ1dHRvbiI7eC5jbGFzc05hbWU9ImhtLXNlbmQiO3gudGV4dENvbnRlbnQ9dDt4Lm9uY2xpY2s9Zm47YS5hcHBlbmRDaGlsZCh4KX1iKGxhYl[0],function(){location.href="https://wa.me/"+phone+"?text="+encodeURIComponent(m)});b(lab[1],function(){location.href="sms:"+phone+"?body="+encodeURIComponent(m)});b(lab[2],function(){location.href="https://t.me/share/url?url=&text="+encodeURIComponent(m)});b(lab[3],function(){location.href="mailto:"+mail+"?subject="+encodeURIComponent("HM Studio Project Request")+"&body="+encodeURIComponent(m)});a.scrollIntoView({behavior:"smooth",block:"nearest"})})}function boot(){layers();order();clock();setInterval(clock,1000)}document.readyState==="loading"?document.addEventListener("DOMContentLoaded",boot,{once:true}):boot()})();' | base64 -d > "$PROJECT/app/src/main/assets/js/hm-v6-stability.js"
+          python3 - "$PROJECT/app/src/main/assets/js/hm-v6-stability.js" <<'PY'
+          import sys
+          from pathlib import Path
+
+          output = Path(sys.argv[1])
+
+          code = r'''
+          (function () {
+            "use strict";
+
+            function getLanguage() {
+              return document.documentElement.lang || "fa";
+            }
+
+            function updateClock() {
+              var now = new Date();
+              var language = getLanguage();
+
+              var locale =
+                language === "fa"
+                  ? "fa-IR-u-ca-persian"
+                  : language === "ar"
+                    ? "ar-SA-u-ca-islamic"
+                    : "en-US";
+
+              var time = new Intl.DateTimeFormat(locale, {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: false
+              }).format(now);
+
+              var date = new Intl.DateTimeFormat(locale, {
+                day: "numeric",
+                month: "long",
+                year: "numeric"
+              }).format(now);
+
+              var clock = document.getElementById("hmStableClock");
+
+              if (!clock) {
+                clock = document.createElement("div");
+                clock.id = "hmStableClock";
+                clock.className = "hm-stable-clock";
+
+                var parent =
+                  document.querySelector(".hero") ||
+                  document.querySelector(".hud-depth") ||
+                  document.body;
+
+                parent.appendChild(clock);
+              }
+
+              clock.textContent = time + "  ·  " + date;
+            }
+
+            function stabilizeVisualLayers() {
+              var selectors = [
+                ".hud-depth",
+                ".scene .screen",
+                ".scene .glass-console",
+                ".scene .depth-layer",
+                ".scene .holo-layer"
+              ];
+
+              document.querySelectorAll(selectors.join(",")).forEach(function (element) {
+                element.classList.add("hm-static-hidden");
+              });
+            }
+
+            function addSendButton(container, label, callback) {
+              var button = document.createElement("button");
+
+              button.type = "button";
+              button.className = "hm-send";
+              button.textContent = label;
+
+              button.addEventListener("click", callback);
+
+              container.appendChild(button);
+            }
+
+            function installOrderForm() {
+              var form = document.getElementById("projectForm");
+
+              if (!form || form.dataset.hmInstalled === "1") {
+                return;
+              }
+
+              form.dataset.hmInstalled = "1";
+
+              form.addEventListener("submit", function (event) {
+                event.preventDefault();
+
+                var data = Object.fromEntries(
+                  new FormData(form).entries()
+                );
+
+                var message = [
+                  "HM Studio - Project Request",
+                  "------------------------------",
+                  "First name: " + (data.firstName || data.firstname || ""),
+                  "Last name: " + (data.lastName || data.lastname || ""),
+                  "Email: " + (data.email || ""),
+                  "Phone: " + (data.phone || ""),
+                  "Project: " + (data.projectType || data.project || ""),
+                  "Budget: " + (data.budget || ""),
+                  "Location: " + (data.location || ""),
+                  "Description: " + (data.description || "")
+                ].join("\n");
+
+                var actions = document.getElementById("hmOrderActions");
+
+                if (!actions) {
+                  actions = document.createElement("div");
+                  actions.id = "hmOrderActions";
+                  actions.className = "hm-order-actions";
+                  form.appendChild(actions);
+                }
+
+                actions.innerHTML = "";
+
+                var language = getLanguage();
+
+                var labels =
+                  language === "fa"
+                    ? ["واتساپ", "پیامک", "تلگرام", "ایمیل"]
+                    : language === "ar"
+                      ? ["واتساب", "SMS", "تلغرام", "البريد"]
+                      : ["WhatsApp", "SMS", "Telegram", "Email"];
+
+                var phone = "+989399020094";
+                var email = "m74981819@gmail.com";
+
+                addSendButton(actions, labels[0], function () {
+                  window.location.href =
+                    "https://wa.me/" +
+                    phone +
+                    "?text=" +
+                    encodeURIComponent(message);
+                });
+
+                addSendButton(actions, labels[1], function () {
+                  window.location.href =
+                    "sms:" +
+                    phone +
+                    "?body=" +
+                    encodeURIComponent(message);
+                });
+
+                addSendButton(actions, labels[2], function () {
+                  window.location.href =
+                    "https://t.me/share/url?url=&text=" +
+                    encodeURIComponent(message);
+                });
+
+                addSendButton(actions, labels[3], function () {
+                  window.location.href =
+                    "mailto:" +
+                    email +
+                    "?subject=" +
+                    encodeURIComponent("HM Studio Project Request") +
+                    "&body=" +
+                    encodeURIComponent(message);
+                });
+
+                actions.scrollIntoView({
+                  behavior: "smooth",
+                  block: "nearest"
+                });
+              });
+            }
+
+            function boot() {
+              stabilizeVisualLayers();
+              installOrderForm();
+              updateClock();
+
+              setInterval(updateClock, 1000);
+            }
+
+            if (document.readyState === "loading") {
+              document.addEventListener(
+                "DOMContentLoaded",
+                boot,
+                { once: true }
+              );
+            } else {
+              boot();
+            }
+          })();
+          '''
+
+          output.write_text(code.strip() + "\n", encoding="utf-8")
+          print("JavaScript created:", output)
+          PY
 
           test -s "$PROJECT/app/src/main/assets/js/hm-v6-stability.js"
 
-      - name: Create mobile stability CSS
+          node --check "$PROJECT/app/src/main/assets/js/hm-v6-stability.js"
+
+          echo "JAVASCRIPT OK"
+
+      - name: Create stability CSS
         shell: bash
         run: |
           set -e
 
           mkdir -p "$PROJECT/app/src/main/assets/css"
 
-          echo 'LmhtLXN0YWJsZS1jbG9ja3tkaXNwbGF5OmJsb2NrIWltcG9ydGFudDtwb3NpdGlvbjpyZWxhdGl2ZSFpbXBvcnRhbnQ7ei1pbmRleDo1MCFpbXBvcnRhbnQ7d2lkdGg6bWluKDkwJSw0MjBweCkhaW1wb3J0YW50O2JveC1zaXppbmc6Ym9yZGVyLWJveCFpbXBvcnRhbnQ7bWFyZ2luOjEwcHggYXV0byAwIWltcG9ydGFudDtwYWRkaW5nOjEwcHggMTJweCFpbXBvcnRhbnQ7Ym9yZGVyLXJhZGl1czoxNHB4IWltcG9ydGFudDtiYWNrZ3JvdW5kOnJnYmEoOCwxMiwxOCwuOTQpIWltcG9ydGFudDtjb2xvcjojZmZmIWltcG9ydGFudDt0ZXh0LWFsaWduOmNlbnRlciFpbXBvcnRhbnQ7Zm9udDo2MDAgMTVweC8xLjUgc3lzdGVtLXVpLHNhbnMtc2VyaWYhaW1wb3J0YW50O29wYWNpdHk6MSFpbXBvcnRhbnQ7dmlzaWJpbGl0eTp2aXNpYmxlIWltcG9ydGFudDthbmltYXRpb246bm9uZSFpbXBvcnRhbnQ7dHJhbnNpdGlvbjpub25lIWltcG9ydGFudDt3aGl0ZS1zcGFjZTpub3JtYWwhaW1wb3J0YW50fS5obS1zdGF0aWMtaGlkZGVue2FuaW1hdGlvbjpub25lIWltcG9ydGFudDt0cmFuc2l0aW9uOm5vbmUhaW1wb3J0YW50O29wYWNpdHk6MCFpbXBvcnRhbnQ7dmlzaWJpbGl0eTpoaWRkZW4haW1wb3J0YW50O3BvaW50ZXItZXZlbnRzOm5vbmUhaW1wb3J0YW50fS5obS1vcmRlci1hY3Rpb25ze2Rpc3BsYXk6ZmxleCFpbXBvcnRhbnQ7ZmxleC13cmFwOndyYXAhaW1wb3J0YW50O2dhcDo4cHghaW1wb3J0YW50O3dpZHRoOjEwMCUhaW1wb3J0YW50O21hcmdpbi10b3A6MTJweCFpbXBvcnRhbnR9LmhtLXNlbmR7bWluLWhlaWdodDo0NnB4IWltcG9ydGFudDtmbGV4OjEgMSAxNDBweCFpbXBvcnRhbnQ7Ym9yZGVyOjAhaW1wb3J0YW50O2JvcmRlci1yYWRpdXM6MTJweCFpbXBvcnRhbnQ7cGFkZGluZzoxMHB4IDE0cHghaW1wb3J0YW50O2ZvbnQ6NzAwIDE0cHgvMS4zIHN5c3RlbS11aSxzYW5zLXNlcmlmIWltcG9ydGFudDtjdXJzb3I6cG9pbnRlciFpbXBvcnRhbnQ7dG91Y2gtYWN0aW9uOm1hbmlwdWxhdGlvbiFpbXBvcnRhbnR9QG1lZGlhKGhvdmVyOm5vbmUpey5obS1zZW5kOmFjdGl2ZXt0cmFuc2Zvcm06dHJhbnNsYXRlWSgxcHgpO2JveC1zaGFkb3c6MCAwIDAgMnB4IHJnYmEoMjIwLDM4LDM4LC4xOCksMCAwIDE2cHggcmdiYSgyMjAsMzgsMzgsLjIyKX19QG1lZGlhKG1heC13aWR0aDo2MDBweCl7LmhtLXN0YWJsZS1jbG9ja3tmb250LXNpemU6MTRweCFpbXBvcnRhbnR9LmhtLW9yZGVyLWFjdGlvbnN7ZGlzcGxheTpncmlkIWltcG9ydGFudDtncmlkLXRlbXBsYXRlLWNvbHVtbnM6MWZyIDFmciFpbXBvcnRhbnR9LmhtLXNlbmR7d2lkdGg6MTAwJSFpbXBvcnRhbnR9fQ==' | base64 -d > "$PROJECT/app/src/main/assets/css/hm-v6-stability.css"
+          python3 - "$PROJECT/app/src/main/assets/css/hm-v6-stability.css" <<'PY'
+          import sys
+          from pathlib import Path
+
+          output = Path(sys.argv[1])
+
+          css = r'''
+          .hm-stable-clock {
+            display: block !important;
+            position: relative !important;
+            z-index: 50 !important;
+            width: min(90%, 420px) !important;
+            box-sizing: border-box !important;
+            margin: 10px auto 0 !important;
+            padding: 10px 12px !important;
+            border-radius: 14px !important;
+            background: rgba(8, 12, 18, 0.94) !important;
+            color: #ffffff !important;
+            text-align: center !important;
+            font: 600 15px/1.5 system-ui, sans-serif !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            animation: none !important;
+            transition: none !important;
+            white-space: normal !important;
+            overflow: visible !important;
+          }
+
+          .hm-static-hidden {
+            animation: none !important;
+            transition: none !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+          }
+
+          .hm-order-actions {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+            width: 100% !important;
+            margin-top: 12px !important;
+          }
+
+          .hm-send {
+            min-height: 46px !important;
+            flex: 1 1 140px !important;
+            border: 0 !important;
+            border-radius: 12px !important;
+            padding: 10px 14px !important;
+            font: 700 14px/1.3 system-ui, sans-serif !important;
+            cursor: pointer !important;
+            touch-action: manipulation !important;
+          }
+
+          @media (hover: none) {
+            .hm-send:active {
+              transform: translateY(1px);
+              box-shadow:
+                0 0 0 2px rgba(220, 38, 38, 0.18),
+                0 0 16px rgba(220, 38, 38, 0.22);
+            }
+          }
+
+          @media (max-width: 600px) {
+            .hm-stable-clock {
+              width: 90% !important;
+              font-size: 14px !important;
+            }
+
+            .hm-order-actions {
+              display: grid !important;
+              grid-template-columns: 1fr 1fr !important;
+            }
+
+            .hm-send {
+              width: 100% !important;
+            }
+          }
+          '''
+
+          output.write_text(css.strip() + "\n", encoding="utf-8")
+          print("CSS created:", output)
+          PY
 
           test -s "$PROJECT/app/src/main/assets/css/hm-v6-stability.css"
+
+          echo "CSS OK"
 
       - name: Attach stability files
         shell: bash
@@ -113,12 +395,44 @@ jobs:
 
           test -f "$INDEX"
 
-          python3 -c "from pathlib import Path; p=Path('$INDEX'); s=p.read_text(encoding='utf-8'); s=s.replace('hm-v6-stability.css','hm-v6-stability.css') if 'hm-v6-stability.css' in s else s.replace('</head>','<link rel=\"stylesheet\" href=\"css/hm-v6-stability.css\">\\n</head>',1); s=s.replace('hm-v6-stability.js','hm-v6-stability.js') if 'hm-v6-stability.js' in s else s.replace('</body>','<script src=\"js/hm-v6-stability.js\"></script>\\n</body>',1); p.write_text(s,encoding='utf-8')"
+          python3 - "$INDEX" <<'PY'
+          import sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          html = path.read_text(encoding="utf-8")
+
+          css_tag = '<link rel="stylesheet" href="css/hm-v6-stability.css">'
+          js_tag = '<script src="js/hm-v6-stability.js"></script>'
+
+          if "hm-v6-stability.css" not in html:
+              if "</head>" in html:
+                  html = html.replace(
+                      "</head>",
+                      css_tag + "\n</head>",
+                      1
+                  )
+              else:
+                  html = css_tag + "\n" + html
+
+          if "hm-v6-stability.js" not in html:
+              if "</body>" in html:
+                  html = html.replace(
+                      "</body>",
+                      js_tag + "\n</body>",
+                      1
+                  )
+              else:
+                  html = html + "\n" + js_tag
+
+          path.write_text(html, encoding="utf-8")
+          print("HTML patched:", path)
+          PY
 
           grep -q "hm-v6-stability.css" "$INDEX"
           grep -q "hm-v6-stability.js" "$INDEX"
 
-          echo "STABILITY PATCH ATTACHED"
+          echo "STABILITY FILES ATTACHED"
 
       - name: Build APK
         shell: bash
@@ -137,19 +451,27 @@ jobs:
             --warning-mode all \
             --console=plain
 
+          echo "BUILD FINISHED"
+
       - name: Verify APK
         shell: bash
         run: |
           set -e
 
-          APK="$(find "$PROJECT/app/build/outputs/apk" -type f -name '*.apk' -print -quit)"
+          APK="$(find "$PROJECT/app/build/outputs/apk" \
+            -type f \
+            -name '*.apk' \
+            -print -quit)"
 
           if [ -z "$APK" ]; then
             echo "========================================"
             echo "ERROR: APK WAS NOT GENERATED"
             echo "========================================"
 
-            find "$PROJECT/app/build" -type f -print | sort || true
+            find "$PROJECT/app/build" \
+              -type f \
+              -print \
+              | sort || true
 
             exit 1
           fi
@@ -161,7 +483,8 @@ jobs:
 
           mkdir -p apk-output
 
-          cp "$APK" apk-output/hm-studio-v6-stable-debug.apk
+          cp "$APK" \
+            apk-output/hm-studio-v6-stable-debug.apk
 
           test -s apk-output/hm-studio-v6-stable-debug.apk
 
