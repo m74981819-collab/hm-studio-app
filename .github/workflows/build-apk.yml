@@ -1,4 +1,4 @@
-name: Build HM Studio APK V6
+name: Build HM Studio APK V6 FINAL
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    name: Build HM Studio APK V6
+    name: Build HM Studio APK V6 FINAL
     runs-on: ubuntu-latest
 
     steps:
@@ -36,26 +36,27 @@ jobs:
           set -e
 
           echo "======================================"
-          echo "EXTRACTING V6 PROJECT"
+          echo "EXTRACTING V6"
           echo "======================================"
 
           rm -rf extracted
-
           mkdir -p extracted
+
+          test -f hm-studio-app-v6-corrected.zip
 
           unzip -o hm-studio-app-v6-corrected.zip -d extracted
 
           echo ""
           echo "ZIP CONTENT:"
-          find extracted -maxdepth 4 -type f | head -200
+          find extracted -maxdepth 5 -type f | head -300
 
-      - name: Locate Project
+      - name: Locate Android Project
         shell: bash
         run: |
           set -e
 
           echo "======================================"
-          echo "LOCATING PROJECT"
+          echo "LOCATING ANDROID PROJECT"
           echo "======================================"
 
           SETTINGS=$(find extracted -type f -name "settings.gradle" -print -quit)
@@ -65,19 +66,20 @@ jobs:
           fi
 
           if [ -z "$SETTINGS" ]; then
-            echo "ERROR: settings.gradle NOT FOUND"
+            echo "ERROR: settings.gradle / settings.gradle.kts NOT FOUND"
             exit 1
           fi
 
           PROJECT=$(dirname "$SETTINGS")
 
-          echo ""
-          echo "PROJECT:"
-          echo "$PROJECT"
-
+          echo "PROJECT=$PROJECT"
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
 
-      - name: Inspect Project
+          echo ""
+          echo "PROJECT CONTENT:"
+          find "$PROJECT" -maxdepth 3 -type f -print | head -300
+
+      - name: Verify Android Project
         shell: bash
         run: |
           set -e
@@ -85,22 +87,861 @@ jobs:
           cd "$PROJECT"
 
           echo "======================================"
-          echo "PROJECT CONTENT"
+          echo "VERIFYING ANDROID PROJECT"
           echo "======================================"
 
-          pwd
+          test -d app
+          test -f settings.gradle || test -f settings.gradle.kts
 
           echo ""
-          echo "FILES:"
-          find . -maxdepth 3 -type f -print
+          echo "ROOT:"
+          ls -la
 
           echo ""
-          echo "APP DIRECTORY:"
+          echo "APP:"
           ls -la app
 
           echo ""
-          echo "GRADLE VERSION:"
+          echo "GRADLE:"
           gradle --version
+
+      - name: Apply Final V6 UI And Form Patch
+        shell: bash
+        run: |
+          set -e
+
+          echo "======================================"
+          echo "APPLYING FINAL V6 PATCH"
+          echo "======================================"
+
+          cd "$PROJECT"
+
+          INDEX=$(find app/src/main/assets -type f -name "index.html" -print -quit)
+
+          if [ -z "$INDEX" ]; then
+            echo "ERROR: index.html NOT FOUND"
+            find app/src/main/assets -maxdepth 4 -type f -print || true
+            exit 1
+          fi
+
+          echo "INDEX=$INDEX"
+
+          cat > /tmp/hm_final_patch.css <<'CSS'
+/* =========================================================
+   HM STUDIO V6 FINAL MOBILE STABILITY PATCH
+   ========================================================= */
+
+/* Stable rendering */
+html,
+body {
+  -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+}
+
+/* Prevent accidental horizontal overflow */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden !important;
+}
+
+/* Fixed/stable information area */
+.hm-stable-info {
+  animation: none !important;
+  -webkit-animation: none !important;
+  transition: none !important;
+  -webkit-transition: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  filter: none !important;
+  will-change: auto !important;
+  text-shadow: none !important;
+  position: relative !important;
+  z-index: 20 !important;
+  min-height: 28px !important;
+  line-height: 1.5 !important;
+  font-size: clamp(12px, 3.1vw, 15px) !important;
+  overflow: visible !important;
+}
+
+/* Small metadata/time text */
+.hm-stable-time {
+  animation: none !important;
+  -webkit-animation: none !important;
+  transition: none !important;
+  -webkit-transition: none !important;
+  transform: none !important;
+  opacity: .92 !important;
+  visibility: visible !important;
+  filter: none !important;
+  will-change: auto !important;
+  font-size: clamp(12px, 3.2vw, 15px) !important;
+  line-height: 1.6 !important;
+  white-space: normal !important;
+}
+
+/* 3D / 5D decorative text:
+   keep it static and subtle instead of blinking/overlapping */
+.hm-stable-watermark {
+  animation: none !important;
+  -webkit-animation: none !important;
+  transition: none !important;
+  -webkit-transition: none !important;
+  transform: none !important;
+  filter: none !important;
+  will-change: auto !important;
+  opacity: .08 !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+/* Never allow a persistent hover shadow on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  a:hover,
+  button:hover,
+  [role="button"]:hover,
+  .card:hover,
+  .project:hover,
+  .service:hover,
+  .glass:hover {
+    transform: none !important;
+  }
+}
+
+/* Short red press feedback */
+.hm-touch-feedback {
+  animation: hmTouchGlow .22s ease-out !important;
+  -webkit-animation: hmTouchGlow .22s ease-out !important;
+}
+
+@keyframes hmTouchGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 0, 0, 0);
+  }
+  45% {
+    box-shadow:
+      0 0 10px 2px rgba(255, 0, 0, .38),
+      0 0 22px 3px rgba(255, 0, 0, .16);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 0, 0, 0);
+  }
+}
+
+/* Form fields */
+.hm-order-form input,
+.hm-order-form textarea,
+.hm-order-form select {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Form action sheet */
+.hm-send-sheet {
+  position: fixed !important;
+  left: 12px !important;
+  right: 12px !important;
+  bottom: calc(12px + env(safe-area-inset-bottom)) !important;
+  z-index: 2147483646 !important;
+  display: none;
+  padding: 14px !important;
+  border-radius: 18px !important;
+  background: rgba(20,20,24,.97) !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  box-shadow: 0 12px 40px rgba(0,0,0,.42) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+.hm-send-sheet.hm-show {
+  display: block !important;
+}
+
+.hm-send-title {
+  margin: 0 0 10px !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  line-height: 1.6 !important;
+  color: #fff !important;
+  text-align: center !important;
+}
+
+.hm-send-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+.hm-send-btn {
+  min-height: 44px !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  padding: 9px 8px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  background: rgba(255,255,255,.1) !important;
+  color: #fff !important;
+}
+
+.hm-send-btn:active {
+  transform: scale(.97) !important;
+}
+
+.hm-send-close {
+  width: 100% !important;
+  margin-top: 8px !important;
+  min-height: 38px !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: rgba(255,255,255,.06) !important;
+  color: rgba(255,255,255,.75) !important;
+}
+
+/* Keep native/real buttons usable */
+button,
+input[type="submit"],
+input[type="button"] {
+  touch-action: manipulation;
+}
+CSS
+
+          cat > /tmp/hm_final_patch.js <<'JS'
+(function () {
+  "use strict";
+
+  /*
+   * HM STUDIO V6 FINAL PATCH
+   * This patch intentionally avoids changing the existing
+   * hamburger/menu/language navigation implementation.
+   */
+
+  function ready(fn) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", fn, { once: true });
+    } else {
+      fn();
+    }
+  }
+
+  function cleanText(value) {
+    return String(value || "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function isVisible(el) {
+    if (!el || !(el instanceof Element)) return false;
+    var s = window.getComputedStyle(el);
+    var r = el.getBoundingClientRect();
+    return s.display !== "none" &&
+      s.visibility !== "hidden" &&
+      parseFloat(s.opacity || "1") > 0 &&
+      r.width > 0 &&
+      r.height > 0;
+  }
+
+  function addClass(el, name) {
+    if (el && el.classList) el.classList.add(name);
+  }
+
+  function markStableElements() {
+    var all = Array.prototype.slice.call(document.querySelectorAll("*"));
+
+    var timePattern =
+      /(\b\d{1,2}:\d{2}\b)|(\b\d{1,2}[：]\d{2}\b)|(\b\d{1,2}\s*(am|pm)\b)/i;
+
+    var metaPattern =
+      /(time|clock|date|datetime|meta|metadata|info|information|stats|status|counter)/i;
+
+    all.forEach(function (el) {
+      if (!isVisible(el)) return;
+
+      var text = cleanText(el.textContent);
+
+      if (!text || text.length > 180) return;
+
+      var cls = cleanText(
+        (el.className && typeof el.className === "string")
+          ? el.className
+          : ""
+      );
+
+      var id = cleanText(el.id || "");
+
+      if (
+        timePattern.test(text) ||
+        metaPattern.test(cls) ||
+        metaPattern.test(id)
+      ) {
+        addClass(el, "hm-stable-info");
+
+        if (timePattern.test(text)) {
+          addClass(el, "hm-stable-time");
+        }
+      }
+
+      if (
+        /5D/i.test(text) ||
+        /\b3D\b/i.test(text) ||
+        /عمق/.test(text) ||
+        /ثلاثي/.test(text) ||
+        /بعدی/.test(text)
+      ) {
+        addClass(el, "hm-stable-watermark");
+      }
+    });
+  }
+
+  function disableBlinkOnlyForInfo() {
+    var candidates = document.querySelectorAll(
+      "[class*='clock'],[class*='time'],[class*='date'],[class*='info'],[class*='meta'],[id*='clock'],[id*='time'],[id*='date']"
+    );
+
+    Array.prototype.forEach.call(candidates, function (el) {
+      addClass(el, "hm-stable-info");
+    });
+  }
+
+  function addPressFeedback() {
+    /*
+     * Only touch/click feedback.
+     * Existing navigation handlers remain untouched.
+     */
+    document.addEventListener(
+      "pointerdown",
+      function (event) {
+        var target = event.target;
+        if (!(target instanceof Element)) return;
+
+        var clickable = target.closest(
+          "button,a,[role='button'],input[type='button'],input[type='submit'],.card,.project,.service"
+        );
+
+        if (!clickable) return;
+
+        clickable.classList.remove("hm-touch-feedback");
+
+        /*
+         * Force a clean animation restart.
+         */
+        void clickable.offsetWidth;
+
+        clickable.classList.add("hm-touch-feedback");
+
+        window.setTimeout(function () {
+          clickable.classList.remove("hm-touch-feedback");
+        }, 260);
+      },
+      { passive: true }
+    );
+  }
+
+  function findContactLinks() {
+    var links = Array.prototype.slice.call(
+      document.querySelectorAll("a[href]")
+    );
+
+    var result = {
+      whatsapp: null,
+      sms: null,
+      telegram: null,
+      email: null
+    };
+
+    links.forEach(function (a) {
+      var href = String(a.getAttribute("href") || "").trim();
+      var low = href.toLowerCase();
+
+      if (!result.whatsapp &&
+          (low.indexOf("wa.me/") !== -1 ||
+           low.indexOf("api.whatsapp.com") !== -1 ||
+           low.indexOf("whatsapp://") === 0)) {
+        result.whatsapp = href;
+      }
+
+      if (!result.sms && low.indexOf("sms:") === 0) {
+        result.sms = href;
+      }
+
+      if (!result.telegram &&
+          (low.indexOf("t.me/") !== -1 ||
+           low.indexOf("telegram.me/") !== -1 ||
+           low.indexOf("tg://") === 0)) {
+        result.telegram = href;
+      }
+
+      if (!result.email && low.indexOf("mailto:") === 0) {
+        result.email = href;
+      }
+    });
+
+    return result;
+  }
+
+  function getFormData(form) {
+    var data = [];
+
+    var fields = form.querySelectorAll(
+      "input,textarea,select"
+    );
+
+    Array.prototype.forEach.call(fields, function (field) {
+      if (!field || field.disabled) return;
+
+      var type = String(field.type || "").toLowerCase();
+
+      if (
+        type === "submit" ||
+        type === "button" ||
+        type === "reset" ||
+        type === "hidden"
+      ) {
+        return;
+      }
+
+      var value = "";
+
+      if (field.tagName.toLowerCase() === "select") {
+        var option = field.options[field.selectedIndex];
+        value = option ? option.text : field.value;
+      } else {
+        value = field.value;
+      }
+
+      value = cleanText(value);
+
+      if (!value) return;
+
+      var label = "";
+
+      if (field.getAttribute("aria-label")) {
+        label = field.getAttribute("aria-label");
+      }
+
+      if (!label && field.getAttribute("placeholder")) {
+        label = field.getAttribute("placeholder");
+      }
+
+      if (!label && field.name) {
+        label = field.name;
+      }
+
+      if (!label && field.id) {
+        label = field.id;
+      }
+
+      label = cleanText(label || "اطلاعات");
+
+      data.push(label + ": " + value);
+    });
+
+    return data;
+  }
+
+  function buildMessage(form) {
+    var rows = getFormData(form);
+
+    var title =
+      cleanText(
+        form.getAttribute("data-order-title") ||
+        form.getAttribute("aria-label")
+      ) || "ثبت سفارش جدید";
+
+    var lines = [
+      "سلام، سفارش جدید از HM Studio",
+      "",
+      title,
+      "--------------------"
+    ];
+
+    if (rows.length) {
+      rows.forEach(function (row) {
+        lines.push(row);
+      });
+    } else {
+      lines.push("درخواست جدید");
+    }
+
+    lines.push("");
+    lines.push("ارسال از اپلیکیشن HM Studio");
+
+    return lines.join("\n");
+  }
+
+  function extractWhatsAppNumber(href) {
+    if (!href) return "";
+
+    try {
+      var match = href.match(
+        /(?:wa\.me\/|phone=)([+0-9][0-9\-().\s]*)/i
+      );
+
+      if (match && match[1]) {
+        return match[1].replace(/[^\d+]/g, "");
+      }
+    } catch (e) {}
+
+    return "";
+  }
+
+  function extractSmsNumber(href) {
+    if (!href) return "";
+
+    var value = href.replace(/^sms:/i, "");
+    value = value.split("?")[0];
+    return value.trim();
+  }
+
+  function extractEmail(href) {
+    if (!href) return "";
+
+    return href
+      .replace(/^mailto:/i, "")
+      .split("?")[0]
+      .trim();
+  }
+
+  function makeActionUrls(message) {
+    var links = findContactLinks();
+
+    var encoded = encodeURIComponent(message);
+
+    var urls = {
+      whatsapp: null,
+      sms: null,
+      telegram: null,
+      email: null
+    };
+
+    var waNumber = extractWhatsAppNumber(links.whatsapp);
+
+    if (waNumber) {
+      urls.whatsapp =
+        "https://wa.me/" +
+        waNumber.replace(/[^\d]/g, "") +
+        "?text=" +
+        encoded;
+    } else if (links.whatsapp) {
+      if (/^https?:\/\//i.test(links.whatsapp)) {
+        urls.whatsapp =
+          links.whatsapp +
+          (links.whatsapp.indexOf("?") === -1 ? "?" : "&") +
+          "text=" +
+          encoded;
+      } else {
+        urls.whatsapp = links.whatsapp;
+      }
+    }
+
+    var smsNumber = extractSmsNumber(links.sms);
+
+    if (smsNumber) {
+      urls.sms =
+        "sms:" +
+        smsNumber +
+        "?body=" +
+        encoded;
+    } else if (links.sms) {
+      urls.sms =
+        links.sms +
+        (links.sms.indexOf("?") === -1 ? "?" : "&") +
+        "body=" +
+        encoded;
+    }
+
+    if (links.telegram) {
+      /*
+       * Telegram deep links differ between clients.
+       * Keep the project's existing Telegram target when available.
+       */
+      urls.telegram = links.telegram;
+    }
+
+    var email = extractEmail(links.email);
+
+    if (email) {
+      urls.email =
+        "mailto:" +
+        email +
+        "?subject=" +
+        encodeURIComponent("سفارش جدید HM Studio") +
+        "&body=" +
+        encoded;
+    } else if (links.email) {
+      urls.email = links.email;
+    }
+
+    return urls;
+  }
+
+  function openExternal(url) {
+    if (!url) return false;
+
+    try {
+      window.location.href = url;
+      return true;
+    } catch (e) {
+      try {
+        window.open(url, "_blank");
+        return true;
+      } catch (e2) {
+        return false;
+      }
+    }
+  }
+
+  function createSendSheet() {
+    var old = document.getElementById("hmSendSheet");
+
+    if (old) return old;
+
+    var sheet = document.createElement("div");
+    sheet.id = "hmSendSheet";
+    sheet.className = "hm-send-sheet";
+
+    sheet.innerHTML =
+      '<div class="hm-send-title">ارسال سفارش</div>' +
+      '<div class="hm-send-grid">' +
+      '<button type="button" class="hm-send-btn" data-hm-send="whatsapp">WhatsApp</button>' +
+      '<button type="button" class="hm-send-btn" data-hm-send="sms">پیامک</button>' +
+      '<button type="button" class="hm-send-btn" data-hm-send="telegram">Telegram</button>' +
+      '<button type="button" class="hm-send-btn" data-hm-send="email">Email</button>' +
+      '</div>' +
+      '<button type="button" class="hm-send-close">بستن</button>';
+
+    document.body.appendChild(sheet);
+
+    return sheet;
+  }
+
+  function handleForms() {
+    var forms = Array.prototype.slice.call(
+      document.querySelectorAll("form")
+    );
+
+    forms.forEach(function (form) {
+      /*
+       * Do not interfere with tiny search/filter forms.
+       * An order/contact form normally has at least two fields.
+       */
+      var fields = form.querySelectorAll(
+        "input:not([type='hidden']):not([type='submit']):not([type='button']),textarea,select"
+      );
+
+      if (fields.length < 2) return;
+
+      if (form.dataset.hmPatched === "1") return;
+
+      form.dataset.hmPatched = "1";
+      form.classList.add("hm-order-form");
+
+      form.addEventListener(
+        "submit",
+        function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+
+          var message = buildMessage(form);
+          var urls = makeActionUrls(message);
+          var sheet = createSendSheet();
+
+          sheet.classList.add("hm-show");
+
+          var buttons = sheet.querySelectorAll("[data-hm-send]");
+
+          Array.prototype.forEach.call(buttons, function (button) {
+            var type = button.getAttribute("data-hm-send");
+            var url = urls[type];
+
+            button.disabled = !url;
+            button.style.opacity = url ? "1" : ".35";
+
+            button.onclick = function () {
+              if (!url) return;
+
+              openExternal(url);
+
+              /*
+               * Close immediately after handing off to the
+               * external Android application.
+               */
+              window.setTimeout(function () {
+                sheet.classList.remove("hm-show");
+              }, 150);
+            };
+          });
+
+          var close = sheet.querySelector(".hm-send-close");
+
+          if (close) {
+            close.onclick = function () {
+              sheet.classList.remove("hm-show");
+            };
+          }
+
+          /*
+           * If the project already contains a WhatsApp target,
+           * make WhatsApp the first/default action.
+           *
+           * We intentionally do not auto-send without the user's
+           * final tap because Android/WhatsApp/SMS require user
+           * interaction and silent sending is unreliable.
+           */
+          if (urls.whatsapp) {
+            var first = sheet.querySelector(
+              '[data-hm-send="whatsapp"]'
+            );
+
+            if (first) {
+              first.focus();
+            }
+          }
+        },
+        true
+      );
+    });
+  }
+
+  function patchSubmitButtons() {
+    /*
+     * Do not replace existing click handlers.
+     * The form submit interception above is enough.
+     */
+  }
+
+  function run() {
+    try {
+      markStableElements();
+      disableBlinkOnlyForInfo();
+      addPressFeedback();
+      handleForms();
+      patchSubmitButtons();
+    } catch (error) {
+      /*
+       * The patch must never stop the original application.
+       */
+      console.warn("HM V6 patch:", error);
+    }
+  }
+
+  ready(function () {
+    run();
+
+    /*
+     * Some V6 components may be rendered after initial load.
+     * Re-check only the stable-info/form areas.
+     */
+    window.setTimeout(function () {
+      try {
+        markStableElements();
+        handleForms();
+      } catch (e) {}
+    }, 700);
+
+    window.setTimeout(function () {
+      try {
+        markStableElements();
+        handleForms();
+      } catch (e) {}
+    }, 1800);
+  });
+})();
+JS
+
+          python3 - "$INDEX" /tmp/hm_final_patch.css /tmp/hm_final_patch.js <<'PY'
+import sys
+from pathlib import Path
+
+index_path = Path(sys.argv[1])
+css_path = Path(sys.argv[2])
+js_path = Path(sys.argv[3])
+
+html = index_path.read_text(encoding="utf-8", errors="ignore")
+css = css_path.read_text(encoding="utf-8")
+js = js_path.read_text(encoding="utf-8")
+
+css_marker = "HM_STUDIO_V6_FINAL_CSS_PATCH"
+js_marker = "HM_STUDIO_V6_FINAL_JS_PATCH"
+
+css_block = (
+    "\n<!-- " + css_marker + " -->\n"
+    "<style id=\"hm-studio-v6-final-css\">\n" +
+    css +
+    "\n</style>\n"
+)
+
+js_block = (
+    "\n<!-- " + js_marker + " -->\n"
+    "<script id=\"hm-studio-v6-final-js\">\n" +
+    js +
+    "\n</script>\n"
+)
+
+# Remove an older copy of our own patch if the ZIP already contains one.
+import re
+
+html = re.sub(
+    r'\s*<!-- HM_STUDIO_V6_FINAL_CSS_PATCH -->.*?</style>\s*',
+    "\n",
+    html,
+    flags=re.S
+)
+
+html = re.sub(
+    r'\s*<!-- HM_STUDIO_V6_FINAL_JS_PATCH -->.*?</script>\s*',
+    "\n",
+    html,
+    flags=re.S
+)
+
+if "</head>" in html.lower():
+    pos = html.lower().rfind("</head>")
+    html = html[:pos] + css_block + html[pos:]
+else:
+    html = css_block + html
+
+if "</body>" in html.lower():
+    pos = html.lower().rfind("</body>")
+    html = html[:pos] + js_block + html[pos:]
+else:
+    html += js_block
+
+index_path.write_text(html, encoding="utf-8")
+
+print("FINAL PATCH APPLIED")
+print("INDEX:", index_path)
+print("SIZE:", index_path.stat().st_size)
+PY
+
+          echo ""
+          echo "PATCH VERIFICATION:"
+          grep -n "HM_STUDIO_V6_FINAL" "$INDEX" || true
+
+          echo ""
+          echo "HTML TAIL:"
+          tail -80 "$INDEX"
+
+      - name: Validate Patched Web Assets
+        shell: bash
+        run: |
+          set -e
+
+          cd "$PROJECT"
+
+          INDEX=$(find app/src/main/assets -type f -name "index.html" -print -quit)
+
+          test -n "$INDEX"
+
+          echo "Checking final HTML markers..."
+
+          grep -q "HM_STUDIO_V6_FINAL_CSS_PATCH" "$INDEX"
+          grep -q "HM_STUDIO_V6_FINAL_JS_PATCH" "$INDEX"
+          grep -q "hm-studio-v6-final-css" "$INDEX"
+          grep -q "hm-studio-v6-final-js" "$INDEX"
+
+          echo "HTML PATCH VALID."
 
       - name: Build Debug APK
         shell: bash
@@ -110,18 +951,23 @@ jobs:
           cd "$PROJECT"
 
           echo "======================================"
-          echo "STARTING REAL GRADLE BUILD"
+          echo "REAL GRADLE BUILD"
           echo "======================================"
 
-          echo "PROJECT=$PROJECT"
+          echo "PROJECT:"
+          pwd
 
           echo ""
-          echo "Gradle tasks:"
+          echo "Gradle:"
+          gradle --version
+
+          echo ""
+          echo "Tasks:"
           gradle tasks --all --console=plain
 
           echo ""
           echo "======================================"
-          echo "ASSEMBLING DEBUG APK"
+          echo "ASSEMBLE DEBUG"
           echo "======================================"
 
           gradle :app:assembleDebug \
@@ -131,7 +977,7 @@ jobs:
 
           echo ""
           echo "======================================"
-          echo "BUILD COMMAND FINISHED"
+          echo "BUILD FINISHED"
           echo "======================================"
 
           echo ""
@@ -142,6 +988,36 @@ jobs:
           echo "APK FILES:"
           find . -type f -name "*.apk" -print
 
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -e
+
+          cd "$PROJECT"
+
+          echo "======================================"
+          echo "VERIFY APK"
+          echo "======================================"
+
+          APK_COUNT=$(find . -type f -name "*.apk" | wc -l)
+
+          echo "APK COUNT: $APK_COUNT"
+
+          if [ "$APK_COUNT" -eq 0 ]; then
+            echo "ERROR: APK WAS NOT GENERATED"
+            echo ""
+            echo "BUILD OUTPUT:"
+            find . -type d -name build -print
+            echo ""
+            echo "ALL FILES:"
+            find . -type f | head -500
+            exit 1
+          fi
+
+          echo ""
+          echo "GENERATED APK FILES:"
+          find . -type f -name "*.apk" -print
+
       - name: Copy APK
         shell: bash
         run: |
@@ -149,16 +1025,16 @@ jobs:
 
           cd "$PROJECT"
 
-          APK=$(find . -type f -name "*.apk" -print -quit)
+          APK=$(find . -type f -name "*.apk" \
+            -path "*/outputs/apk/debug/*.apk" \
+            -print -quit)
+
+          if [ -z "$APK" ]; then
+            APK=$(find . -type f -name "*.apk" -print -quit)
+          fi
 
           if [ -z "$APK" ]; then
             echo "ERROR: APK NOT FOUND"
-            echo ""
-            echo "PROJECT:"
-            pwd
-            echo ""
-            echo "FILES:"
-            find . -type f | head -300
             exit 1
           fi
 
@@ -167,15 +1043,17 @@ jobs:
 
           mkdir -p "$GITHUB_WORKSPACE/apk-output"
 
-          cp "$APK" "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v6-debug.apk"
+          cp "$APK" \
+            "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v6-final-debug.apk"
 
           echo ""
           echo "FINAL APK:"
-          ls -lh "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v6-debug.apk"
+          ls -lh \
+            "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v6-final-debug.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: hm-studio-app-v6-debug
-          path: apk-output/hm-studio-app-v6-debug.apk
+          name: hm-studio-app-v6-final-debug
+          path: apk-output/hm-studio-app-v6-final-debug.apk
           if-no-files-found: error
