@@ -19,105 +19,159 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Java 17
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Find V6 ZIP
-        run: |
-          set -e
-
-          test -f hm-studio-app-v6-corrected.zip
-
-          echo "V6 ZIP:"
-          ls -lh hm-studio-app-v6-corrected.zip
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
 
       - name: Extract V6
+        shell: bash
         run: |
           set -e
 
+          echo "======================================"
+          echo "EXTRACTING V6 PROJECT"
+          echo "======================================"
+
           rm -rf extracted
-          mkdir extracted
+
+          mkdir -p extracted
 
           unzip -o hm-studio-app-v6-corrected.zip -d extracted
 
-          echo "Extracted:"
-          find extracted -maxdepth 3 -type f | head -100
+          echo ""
+          echo "ZIP CONTENT:"
+          find extracted -maxdepth 4 -type f | head -200
 
-      - name: Find Android project
+      - name: Locate Project
+        shell: bash
         run: |
           set -e
 
-          PROJECT=$(find extracted -type f -name gradlew -print -quit)
+          echo "======================================"
+          echo "LOCATING PROJECT"
+          echo "======================================"
 
-          if [ -z "$PROJECT" ]; then
-            echo "gradlew not found"
+          SETTINGS=$(find extracted -type f -name "settings.gradle" -print -quit)
 
-            SETTINGS=$(find extracted -type f -name settings.gradle -print -quit)
-
-            if [ -z "$SETTINGS" ]; then
-              SETTINGS=$(find extracted -type f -name settings.gradle.kts -print -quit)
-            fi
-
-            if [ -z "$SETTINGS" ]; then
-              echo "Android project not found"
-              exit 1
-            fi
-
-            PROJECT=$(dirname "$SETTINGS")
-          else
-            PROJECT=$(dirname "$PROJECT")
+          if [ -z "$SETTINGS" ]; then
+            SETTINGS=$(find extracted -type f -name "settings.gradle.kts" -print -quit)
           fi
 
-          echo "PROJECT=$PROJECT"
+          if [ -z "$SETTINGS" ]; then
+            echo "ERROR: settings.gradle NOT FOUND"
+            exit 1
+          fi
+
+          PROJECT=$(dirname "$SETTINGS")
+
+          echo ""
+          echo "PROJECT:"
+          echo "$PROJECT"
 
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
 
-      - name: Build APK
+      - name: Inspect Project
+        shell: bash
         run: |
           set -e
-          set -x
 
           cd "$PROJECT"
 
           echo "======================================"
-          echo "BUILDING HM STUDIO APK"
+          echo "PROJECT CONTENT"
           echo "======================================"
 
           pwd
-          ls -la
 
-          chmod +x gradlew
+          echo ""
+          echo "FILES:"
+          find . -maxdepth 3 -type f -print
 
-          ./gradlew clean assembleDebug --no-daemon --stacktrace
+          echo ""
+          echo "APP DIRECTORY:"
+          ls -la app
 
-          echo "======================================"
-          echo "BUILD FINISHED"
-          echo "======================================"
+          echo ""
+          echo "GRADLE VERSION:"
+          gradle --version
 
-          find . -type f -name "*.apk" -print
-
-      - name: Copy APK
+      - name: Build Debug APK
+        shell: bash
         run: |
           set -e
 
-          APK=$(find "$PROJECT" -type f -name "*.apk" -print -quit)
+          cd "$PROJECT"
+
+          echo "======================================"
+          echo "STARTING REAL GRADLE BUILD"
+          echo "======================================"
+
+          echo "PROJECT=$PROJECT"
+
+          echo ""
+          echo "Gradle tasks:"
+          gradle tasks --all --console=plain
+
+          echo ""
+          echo "======================================"
+          echo "ASSEMBLING DEBUG APK"
+          echo "======================================"
+
+          gradle :app:assembleDebug \
+            --no-daemon \
+            --stacktrace \
+            --console=plain
+
+          echo ""
+          echo "======================================"
+          echo "BUILD COMMAND FINISHED"
+          echo "======================================"
+
+          echo ""
+          echo "BUILD DIRECTORIES:"
+          find . -type d -name build -print
+
+          echo ""
+          echo "APK FILES:"
+          find . -type f -name "*.apk" -print
+
+      - name: Copy APK
+        shell: bash
+        run: |
+          set -e
+
+          cd "$PROJECT"
+
+          APK=$(find . -type f -name "*.apk" -print -quit)
 
           if [ -z "$APK" ]; then
             echo "ERROR: APK NOT FOUND"
+            echo ""
+            echo "PROJECT:"
+            pwd
+            echo ""
+            echo "FILES:"
+            find . -type f | head -300
             exit 1
           fi
 
           echo "APK FOUND:"
           echo "$APK"
 
-          mkdir -p apk-output
+          mkdir -p "$GITHUB_WORKSPACE/apk-output"
 
-          cp "$APK" apk-output/hm-studio-app-v6-debug.apk
+          cp "$APK" "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v6-debug.apk"
 
-          ls -lh apk-output/hm-studio-app-v6-debug.apk
+          echo ""
+          echo "FINAL APK:"
+          ls -lh "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v6-debug.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
