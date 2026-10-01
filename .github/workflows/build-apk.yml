@@ -1,121 +1,396 @@
-name: HM Studio V6 - Stable APK
+name: HM Studio V6 Stable APK
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: read
-
-env:
-  GRADLE_VERSION: '8.11.1'
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
 
-      - name: Gradle 8.11.1
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: ${{ env.GRADLE_VERSION }}
-
-      - name: Extract V6 project
+      - name: Extract V6
         shell: bash
         run: |
-          set -euo pipefail
+          set -e
 
-          ZIP="$(find . -maxdepth 3 -type f -name 'hm-studio-app-v6-corrected.zip' -print -quit)"
+          ZIP=$(find . -type f -name 'hm-studio-app-v6-corrected.zip' | head -n 1)
 
           if [ -z "$ZIP" ]; then
-            echo "ERROR: hm-studio-app-v6-corrected.zip not found."
+            echo "ERROR: V6 ZIP NOT FOUND"
             exit 1
           fi
 
-          rm -rf build-v6
-          mkdir -p build-v6
+          echo "V6 ZIP: $ZIP"
 
-          unzip -q "$ZIP" -d build-v6
+          rm -rf v6-project
+          mkdir -p v6-project
 
-          PROJECT="$(find build-v6 -type f -name settings.gradle -print -quit | xargs -r dirname)"
+          unzip -q "$ZIP" -d v6-project
+
+          PROJECT=$(find v6-project -type f -name 'settings.gradle' -print -quit | xargs -r dirname)
 
           if [ -z "$PROJECT" ]; then
-            echo "ERROR: Android project was not found."
-            exit 1
-          fi
-
-          if [ ! -f "$PROJECT/app/build.gradle" ]; then
-            echo "ERROR: app/build.gradle was not found."
+            echo "ERROR: settings.gradle NOT FOUND"
+            find v6-project -maxdepth 5 -type f | head -100
             exit 1
           fi
 
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
 
-          echo "======================================"
-          echo "V6 PROJECT FOUND"
-          echo "======================================"
-          echo "Project: $PROJECT"
+          echo "ANDROID PROJECT:"
+          echo "$PROJECT"
 
-      - name: Apply stable mobile patch
+      - name: Install Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Check Android project
         shell: bash
         run: |
-          set -euo pipefail
-
-          mkdir -p "$PROJECT/app/src/main/assets/js"
-          mkdir -p "$PROJECT/app/src/main/assets/css"
-
-          printf '%s' 'KCgpPT57CiAgJ3VzZSBzdHJpY3QnOwogIGNvbnN0IFBIT05FPScrOTg5Mzk5MDIwMDk0JzsKICBjb25zdCBFTUFJTD0nbTc0OTgxODE5QGdtYWlsLmNvbSc7CiAgY29uc3QgJD1zPT5kb2N1bWVudC5xdWVyeVNlbGVjdG9yKHMpOwogIGNvbnN0IGxhbmc9KCk9PmRvY3VtZW50LmRvY3VtZW50RWxlbWVudC5sYW5nfHwnZmEnOwogIGNvbnN0IHRleHQ9ewogICAgZmE6e3dhOifYp9ix2LPYp9mEINiv2LEg2YjYp9iq2LPYp9m+JyxzbXM6J9in2LHYs9in2YQg2KjYpyDZvtuM2KfZhdqpJyx0Zzon2KfYsdiz2KfZhCDYr9ixINiq2YTar9ix2KfZhScsbWFpbDon2KfYsdiz2KfZhCDYqNinINin24zZhduM2YQnLHJlYWR5OifYr9ix2K7ZiNin2LPYqiDYotmF2KfYr9mHINin2LHYs9in2YQg2KfYs9iq2Jsg2LHZiNi0INin2LHYs9in2YQg2LHYpyDYp9mG2KrYrtin2Kgg2qnZhtuM2K8uJyxpbnZhbGlkOifZhNi32YHYp9mLINmF2YjYp9ix2K8g2YXYtNiu2LXigIzYtNiv2Ycg2LHYpyDaqdin2YXZhCDaqdmG24zYry4nfSwKICAgIGVuOnt3YTonU2VuZCB2aWEgV2hhdHNBcHAnLHNtczonU2VuZCBieSBTTVMnLHRnOidTZW5kIHZpYSBUZWxlZ3JhbScsbWFpbDonU2VuZCBieSBFbWFpbCcscmVhZHk6J1lvdXIgcmVxdWVzdCBpcyByZWFkeS4gQ2hvb3NlIGEgc2VuZGluZyBtZXRob2QuJyxpbnZhbGlkOidQbGVhc2UgY29tcGxldGUgdGhlIGhpZ2hsaWdodGVkIGZpZWxkcy4nfSwKICAgIGFyOnt3YTon2KXYsdiz2KfZhCDYudio2LEg2YjYp9iq2LPYp9ioJyxzbXM6J9il2LHYs9in2YQg2KjYsdiz2KfZhNipINmG2LXZitipJyx0Zzon2KXYsdiz2KfZhCDYudio2LEg2KrZitmE2YrYrNix2KfZhScsbWFpbDon2KXYsdiz2KfZhCDYqNin2YTYqNix2YrYrycscmVhZHk6J9in2YTYt9mE2Kgg2KzYp9mH2LIg2YTZhNil2LHYs9in2YTYmyDYp9iu2KrYsSDYt9ix2YrZgtipINin2YTYpdix2LPYp9mELicsaW52YWxpZDon2YrYsdis2Ykg2KXZg9mF2KfZhCDYp9mE2K3ZgtmI2YQg2KfZhNmF2K3Yr9iv2KkuJ30KICB9OwogIGZ1bmN0aW9uIGxvY2FsZSgpe2NvbnN0IGw9bGFuZygpO3JldHVybiBsPT09J2ZhJz8nZmEtSVInOmw9PT0nYXInPydhci1TQSc6J2VuLVVTJzt9CiAgZnVuY3Rpb24gdXBkYXRlSGVyb0Nsb2NrKCl7CiAgICBjb25zdCBub3c9bmV3IERhdGUoKSwgbD1sYW5nKCksIGxvYz1sb2NhbGUoKTsKICAgIGNvbnN0IHRpbWU9bmV3IEludGwuRGF0ZVRpbWVGb3JtYXQobG9jLHtob3VyOicyLWRpZ2l0JyxtaW51dGU6JzItZGlnaXQnLHNlY29uZDonMi1kaWdpdCcsaG91cjEyOmZhbHNlfSkuZm9ybWF0KG5vdyk7CiAgICBjb25zdCBjYWxMb2M9bD09PSdmYSc/J2ZhLUlSLXUtY2EtcGVyc2lhbic6bD09PSdhcic/J2FyLVNBLXUtY2EtaXNsYW1pYy11bWFscXVyYSc6J2VuLVVTJzsKICAgIGNvbnN0IGRhdGU9bmV3IEludGwuRGF0ZVRpbWVGb3JtYXQoY2FsTG9jLHtkYXk6J251bWVyaWMnLG1vbnRoOidsb25nJyx5ZWFyOidudW1lcmljJ30pLmZvcm1hdChub3cpOwogICAgY29uc3Qgd2Vla2RheT1uZXcgSW50bC5EYXRlVGltZUZvcm1hdChjYWxMb2Mse3dlZWtkYXk6J2xvbmcnfSkuZm9ybWF0KG5vdyk7CiAgICBjb25zdCBjbG9jaz0kKCcjaGVyb0Nsb2NrJykgfHwgZG9jdW1lbnQucXVlcnlTZWxlY3RvcignLmh1ZC1kZXB0aCA+IGRpdjpmaXJzdC1jaGlsZCBiJyk7CiAgICBpZihjbG9jayl7Y2xvY2suaWQ9J2hlcm9DbG9jayc7Y2xvY2sucmVtb3ZlQXR0cmlidXRlKCdkYXRhLWkxOG4nKTtjbG9jay50ZXh0Q29udGVudD10aW1lO30KICAgIGNvbnN0IGQ9JCgnI2hlcm9EYXRlJyk7IGlmKGQpZC50ZXh0Q29udGVudD1kYXRlOwogICAgY29uc3QgYz0kKCcjaGVyb0NhbGVuZGFyJyk7IGlmKGMpYy50ZXh0Q29udGVudD1kYXRlOwogICAgY29uc3Qgdz0kKCcjaGVyb1dlZWtkYXknKTsgaWYodyl3LnRleHRDb250ZW50PXdlZWtkYXk7CiAgfQogIGZ1bmN0aW9uIG1lc3NhZ2VGcm9tKGZvcm0pewogICAgY29uc3QgZD1PYmplY3QuZnJvbUVudHJpZXMobmV3IEZvcm1EYXRhKGZvcm0pLmVudHJpZXMoKSk7CiAgICBjb25zdCBsaW5lcz1bCiAgICAgIGwoJ9iz2YHYp9ix2LQg2KzYr9uM2K8g2b7YsdmI2pjZhyAtIEhNIFN0dWRpbycsJ05ldyBITSBTdHVkaW8gcHJvamVjdCByZXF1ZXN0Jywn2LfZhNioINmF2LTYsdmI2Lkg2KzYr9mK2K8gLSBITSBTdHVkaW8nKSwKICAgICAgJy0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLScsCiAgICAgIGwoJ9mG2KfZhTogJywnRmlyc3QgbmFtZTogJywn2KfZhNin2LPZhTogJykrKGQuZmlyc3ROYW1lfHwnJyksCiAgICAgIGwoJ9mG2KfZhSDYrtin2YbZiNin2K/ar9uMOiAnLCdMYXN0IG5hbWU6ICcsJ9in2LPZhSDYp9mE2LnYp9im2YTYqTogJykrKGQubGFzdE5hbWV8fCcnKSwKICAgICAgbCgn2qnYtNmI2LE6ICcsJ0NvdW50cnk6ICcsJ9in2YTYr9mI2YTYqTogJykrKGQuY291bnRyeXx8JycpLAogICAgICBsKCfYp9uM2YXbjNmEOiAnLCdFbWFpbDogJywn2KfZhNio2LHZitivOiAnKSsoZC5lbWFpbHx8JycpLAogICAgICBsKCfYtNmF2KfYsdmHINiq2YXYp9izOiAnLCdQaG9uZTogJywn2KfZhNmH2KfYqtmBOiAnKSsoZC5waG9uZXx8JycpLAogICAgICBsKCfZhtmI2Lkg2b7YsdmI2pjZhzogJywnUHJvamVjdCB0eXBlOiAnLCfZhtmI2Lkg2KfZhNmF2LTYsdmI2Lk6ICcpKyhkLnByb2plY3RUeXBlfHwnJyksCiAgICAgIGwoJ9io2YjYr9is2Yc6ICcsJ0J1ZGdldDogJywn2KfZhNmF2YrYstin2YbZitipOiAnKSsoZC5idWRnZXR8fCcnKSwKICAgICAgbCgn2YXZiNmC2LnbjNiqOiAnLCdMb2NhdGlvbjogJywn2KfZhNmF2YjZgti5OiAnKSsoZC5sb2NhdGlvbnx8JycpLAogICAgICAnJywKICAgICAgbCgn2KrZiNi224zYrdin2Kog2b7YsdmI2pjZhzonLCdQcm9qZWN0IGRlc2NyaXB0aW9uOicsJ9mI2LXZgSDYp9mE2YXYtNix2YjYuTonKSwKICAgICAgZC5kZXNjcmlwdGlvbnx8JycKICAgIF07CiAgICByZXR1cm4gbGluZXMuam9pbignXG4nKTsKICAgIGZ1bmN0aW9uIGwoYSxiLGMpe3JldHVybiBsYW5nKCk9PT0nZmEnP2E6bGFuZygpPT09J2FyJz9jOmI7fQogIH0KICBmdW5jdGlvbiB2YWxpZChmb3JtKXsKICAgIGxldCBvaz10cnVlOwogICAgZm9ybS5xdWVyeVNlbGVjdG9yQWxsKCdbcmVxdWlyZWRdJykuZm9yRWFjaChpbnB1dD0+ewogICAgICBjb25zdCB2PVN0cmluZyhpbnB1dC52YWx1ZXx8JycpLnRyaW0oKTsKICAgICAgbGV0IGJhZD0hdjsKICAgICAgaWYoIWJhZCYmaW5wdXQudHlwZT09PSdlbWFpbCcpYmFkPSEvXlxTK0BcUytcLlxTKyQvLnRlc3Qodik7CiAgICAgIGlmKCFiYWQmJmlucHV0Lm1pbkxlbmd0aCliYWQ9di5sZW5ndGg8aW5wdXQubWluTGVuZ3RoOwogICAgICBjb25zdCBsYWJlbD1pbnB1dC5jbG9zZXN0KCdsYWJlbCcpOwogICAgICBsYWJlbD8uY2xhc3NMaXN0LnRvZ2dsZSgnZmllbGQtaW52YWxpZCcsYmFkKTsKICAgICAgY29uc3QgZXJyPWxhYmVsPy5xdWVyeVNlbGVjdG9yKCcuZXJyb3InKTsKICAgICAgaWYoZXJyKWVyci50ZXh0Q29udGVudD1iYWQ/KGlucHV0LnR5cGU9PT0nZW1haWwnPydJbnZhbGlkIGVtYWlsJzonUmVxdWlyZWQnKTonJzsKICAgICAgaWYoYmFkKW9rPWZhbHNlOwogICAgfSk7CiAgICByZXR1cm4gb2s7CiAgfQogIGZ1bmN0aW9uIG1ha2VCdXR0b24obGFiZWwsY2xzLGZuKXtjb25zdCBiPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2J1dHRvbicpO2IudHlwZT0nYnV0dG9uJztiLmNsYXNzTmFtZT0nYnRuICcrY2xzO2IudGV4dENvbnRlbnQ9bGFiZWw7Yi5hZGRFdmVudExpc3RlbmVyKCdjbGljaycsZm4pO3JldHVybiBiO30KICBmdW5jdGlvbiBpbnN0YWxsRm9ybSgpewogICAgY29uc3QgZm9ybT0kKCcjcHJvamVjdEZvcm0nKTsgaWYoIWZvcm0pcmV0dXJuOwogICAgZm9ybS5vbnN1Ym1pdD1lPT57CiAgICAgIGUucHJldmVudERlZmF1bHQoKTsKICAgICAgaWYoIXZhbGlkKGZvcm0pKXtjb25zdCBzPSQoJyNmb3JtU3RhdHVzJyk7aWYocylzLnRleHRDb250ZW50PXRleHRbbGFuZygpXT8uaW52YWxpZHx8dGV4dC5mYS5pbnZhbGlkO3JldHVybjt9CiAgICAgIGNvbnN0IGRhdGE9T2JqZWN0LmZyb21FbnRyaWVzKG5ldyBGb3JtRGF0YShmb3JtKS5lbnRyaWVzKCkpOwogICAgICBkYXRhLmNyZWF0ZWRBdD1uZXcgRGF0ZSgpLnRvSVNPU3RyaW5nKCk7CiAgICAgIGRhdGEubGFuZ3VhZ2U9bGFuZygpOwogICAgICBkYXRhLmxvY2F0aW9uPSQoJyNsb2NhdGlvblN0YXR1cycpPy5kYXRhc2V0LmNvb3Jkc3x8ZGF0YS5sb2NhdGlvbnx8Jyc7CiAgICAgIHRyeXtsb2NhbFN0b3JhZ2Uuc2V0SXRlbSgnaG0tcHJvamVjdC0nK0RhdGUubm93KCksSlNPTi5zdHJpbmdpZnkoZGF0YSkpO31jYXRjaChfKXsgfQogICAgICBjb25zdCBtc2c9bWVzc2FnZUZyb20oZm9ybSksIHN0YXR1cz0kKCcjZm9ybVN0YXR1cycpOwogICAgICBpZihzdGF0dXMpc3RhdHVzLnRleHRDb250ZW50PXRleHRbbGFuZygpXT8ucmVhZHl8fHRleHQuZmEucmVhZHk7CiAgICAgIGxldCBhY3Rpb25zPSQoJyNvcmRlckFjdGlvbnMnKTsKICAgICAgaWYoIWFjdGlvbnMpe2FjdGlvbnM9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnZGl2Jyk7YWN0aW9ucy5pZD0nb3JkZXJBY3Rpb25zJztmb3JtLnF1ZXJ5U2VsZWN0b3IoJy5mb3JtLWFjdGlvbnMnKT8uYWZ0ZXIoYWN0aW9ucyk7fQogICAgICBhY3Rpb25zLnJlcGxhY2VDaGlsZHJlbigpOwogICAgICBhY3Rpb25zLmFwcGVuZCgKICAgICAgICBtYWtlQnV0dG9uKHRleHRbbGFuZygpXT8ud2F8fHRleHQuZmEud2EsJ3ByaW1hcnknLCgpPT53aW5kb3cuSE1OYXRpdmU/LnNlbmRPcmRlclRvV2hhdHNBcHA/d2luZG93LkhNTmF0aXZlLnNlbmRPcmRlclRvV2hhdHNBcHAobXNnKTp3aW5kb3cub3BlbignaHR0cHM6Ly93YS5tZS8nK1BIT05FKyc/dGV4dD0nK2VuY29kZVVSSUNvbXBvbmVudChtc2cpLCdfYmxhbmsnLCdub29wZW5lcicpKSwKICAgICAgICBtYWtlQnV0dG9uKHRleHRbbGFuZygpXT8uc21zfHx0ZXh0LmZhLnNtcywnZ2hvc3QnLCgpPT53aW5kb3cuSE1OYXRpdmU/LnNlbmRPcmRlckJ5U21zP3dpbmRvdy5ITU5hdGl2ZS5zZW5kT3JkZXJCeU1zbShtc2cpOndpbmRvdy5sb2NhdGlvbi5ocmVmPSdzbXM6JytQSE9ORSsnP2JvZHk9JytlbmNvZGVVUklDb21wb25lbnQobXNnKSksCiAgICAgICAgbWFrZUJ1dHRvbih0ZXh0W2xhbmcoKV0/LnRnfHx0ZXh0LmZhLnRnLCdnaG9zdCcsKCk9PndpbmRvdy5vcGVuKCdodHRwczovL3QubWUvc2hhcmUvdXJsP3VybD0mdGV4dD0nK2VuY29kZVVSSUNvbXBvbmVudChtc2cpLCdfYmxhbmsnLCdub29wZW5lcicpKSwKICAgICAgICBtYWtlQnV0dG9uKHRleHRbbGFuZygpXT8ubWFpbHx8dGV4dC5mYS5tYWlsLCdnaG9zdCcsKCk9PndpbmRvdy5sb2NhdGlvbi5ocmVmPSdtYWlsdG86JytFTUFJTCsnP3N1YmplY3Q9JytlbmNvZGVVUklDb21wb25lbnQoJ0hNIFN0dWRpbyBQcm9qZWN0IFJlcXVlc3QnKSsnJmJvZHk9JytlbmNvZGVVUklDb21wb25lbnQobXNnKSkKICAgICAgKTsKICAgICAgYWN0aW9ucy5zY3JvbGxJbnRvVmlldyh7YmVoYXZpb3I6J3Ntb290aCcsYmxvY2s6J25lYXJlc3QnfSk7CiAgICB9OwogICAgZm9ybS5hZGRFdmVudExpc3RlbmVyKCdpbnB1dCcsZT0+e2lmKGUudGFyZ2V0Lm1hdGNoZXMoJ1tyZXF1aXJlZF0nKSl2YWxpZEZpZWxkKGUudGFyZ2V0KTt9KTsKICAgIGZ1bmN0aW9uIHZhbGlkRmllbGQoaW5wdXQpewogICAgICBjb25zdCB2PVN0cmluZyhpbnB1dC52YWx1ZXx8JycpLnRyaW0oKTtsZXQgYmFkPSF2OwogICAgICBpZighYmFkJiZpbnB1dC50eXBlPT09J2VtYWlsJyliYWQ9IS9eXFMrQFxTK1wuXFMrJC8udGVzdCh2KTsKICAgICAgaWYoIWJhZCYmaW5wdXQubWluTGVuZ3RoKWJhZD12Lmxlbmd0aDxpbnB1dC5taW5MZW5ndGg7CiAgICAgIGlucHV0LmNsb3Nlc3QoJ2xhYmVsJyk/LmNsYXNzTGlzdC50b2dnbGUoJ2ZpZWxkLWludmFsaWQnLGJhZCk7CiAgICAgIGNvbnN0IGVycmxpbnB1dC5jbG9zZXN0KCdsYWJlbCcpPy5xdWVyeVNlbGVjdG9yKCcuZXJyb3InKTtpZihlcnImJiFiYWQpZXJyLnRleHRDb250ZW50PScnOwogICAgfQogIH0KICBmdW5jdGlvbiBpbnN0YWxsVmlzdWFsU3RhYmlsaXR5KCl7CiAgICBjb25zdCBoZXJvQ2xvY2s9JCgnI2hlcm9DbG9jaycpfHxkb2N1bWVudC5xdWVyeVNlbGVjdG9yKCcuaHVkLWRlcHRoID4gZGl2OmZpcnN0LWNoaWxkIGInKTsKICAgIGlmKGhlcm9DbG9jayl7aGVyb0Nsb2NrLmlkPSdoZXJvQ2xvY2snO2hlcm9DbG9jay5yZW1vdmVBdHRyaWJ1dGUoJ2RhdGEtaTE4bicpO30KICAgIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoJy5odWQtZGVwdGgnKT8uc2V0QXR0cmlidXRlKCdkYXRhLXN0YWJsZScsJzEnKTsKICAgIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJy5zY2VuZSAuZ2xhc3MtY29uc29sZSwuc2NlbmUgLnNjcmVlbiwuc2NlbmUgLmRlcHRoLWxheWVyLC5zY2VuZSAuaG9sby1sYXllcicpLmZvckVhY2goZWw9PmVsLnNldEF0dHJpYnV0ZSgnZGF0YS1tb2JpbGUtZGVjb3InLCcxJykpOwogIH0KICBmdW5jdGlvbiBib290KCl7aW5zdGFsbFZpc3VhbFN0YWJpbGl0eSgpO2luc3RhbGxGb3JtKCk7dXBkYXRlSGVyb0Nsb2NrKCk7c2V0SW50ZXJ2YWwodXBkYXRlSGVyb0Nsb2NrLDEwMDApO30KICBpZihkb2N1bWVudC5yZWFkeVN0YXRlPT09J2xvYWRpbmcnKWRvY3VtZW50LmFkZEV2ZW50TGlzdGVuZXIoJ0RPTUNvbnRlbnRMb2FkZWQnLGJvb3Qse29uY2U6dHJ1ZX0pO2Vsc2UgYm9vdCgpOwp9KSgpOwo=' | base64 -d > "$PROJECT/app/src/main/assets/js/stability-v6.js"
-
-          printf '%s' 'LyogSE0gU3R1ZGlvIFY2IG1vYmlsZSBzdGFiaWxpdHkgcGF0Y2g6IG9ubHkgaGVybyBjbG9jay9vcmRlciBmb3JtL3Zpc3VhbCBsYXllcnMuICovCi5odWQtZGVwdGh7YW5pbWF0aW9uOm5vbmUhaW1wb3J0YW50O3RyYW5zaXRpb246bm9uZSFpbXBvcnRhbnQ7b3BhY2l0eToxIWltcG9ydGFudDt2aXNpYmlsaXR5OnZpc2libGUhaW1wb3J0YW50O30KLmh1ZC1kZXB0aCBiLC5odWQtZGVwdGggc3Ryb25nLC5odWQtZGVwdGggc21hbGx7YW5pbWF0aW9uOm5vbmUhaW1wb3J0YW50O3RyYW5zaXRpb246bm9uZSFpbXBvcnRhbnQ7b3BhY2l0eToxIWltcG9ydGFudDt2aXNpYmlsaXR5OnZpc2libGUhaW1wb3J0YW50O30KI29yZGVyQWN0aW9uc3tkaXNwbGF5OmZsZXg7ZmxleC13cmFwOndyYXA7Z2FwOjhweDttYXJnaW4tdG9wOjEycHg7d2lkdGg6MTAwJTt9CiNvcmRlckFjdGlvbnMgLmJ0bnttaW4taGVpZ2h0OjQ2cHg7ZmxleDoxIDEgMTUwcHg7dG91Y2gtYWN0aW9uOm1hbmlwdWxhdGlvbjt9CkBtZWRpYShtYXgtd2lkdGg6OTUwcHgpewogIC5oZXJvIC5zY2VuZXtoZWlnaHQ6NTYwcHghaW1wb3J0YW50O21pbi1oZWlnaHQ6NTYwcHghaW1wb3J0YW50O3RyYW5zZm9ybTpub25lIWltcG9ydGFudDthbmltYXRpb246bm9uZSFpbXBvcnRhbnQ7b3ZlcmZsb3c6dmlzaWJsZSFpbXBvcnRhbnQ7fQogIC5oZXJvIC5zY2VuZTo6YmVmb3JlLC5oZXJvIC5zY2VuZTo6YWZ0ZXJ7ZGlzcGxheTpub25lIWltcG9ydGFudDt9CiAgLmhlcm8gLnNjZW5lIC5zY3JlZW4sLmhlcm8gLnNjZW5lIC5nbGFzcy1jb25zb2xlLC5oZXJvIC5zY2VuZSAuZGVwdGgtbGF5ZXIsLmhlcm8gLnNjZW5lIC5ob2xvLWxheWVyLC5oZXJvIC5zY2VuZSAuZGF0YS1vcmJ7ZGlzcGxheTpub25lIWltcG9ydGFudDt9CiAgLmhlcm8gLmhlcm8tcGhvdG8td3JhcHtkaXNwbGF5OmJsb2NrIWltcG9ydGFudDt0b3A6MCFpbXBvcnRhbnQ7cmlnaHQ6NSUhaW1wb3J0YW50O2xlZnQ6NSUhaW1wb3J0YW50O3dpZHRoOjkwJSFpbXBvcnRhbnQ7aGVpZ2h0OjM2NXB4IWltcG9ydGFudDt0cmFuc2Zvcm06bm9uZSFpbXBvcnRhbnQ7ei1pbmRleDoxMCFpbXBvcnRhbnQ7fQogIC5oZXJvIC5oZXJvLXBob3Rve3dpZHRoOjEwMCUhaW1wb3J0YW50O2hlaWdodDoxMDAlIWltcG9ydGFudDtvYmplY3QtZml0OmNvdmVyIWltcG9ydGFudDtvYmplY3QtcG9zaXRpb246Y2VudGVyIHRvcCFpbXBvcnRhbnQ7Ym9yZGVyLXJhZGl1czoyOHB4IWltcG9ydGFudDtkaXNwbGF5OmJsb2NrIWltcG9ydGFudDt9CiAgLmhlcm8gLmh1ZC1kZXB0aHt0b3A6MzgycHghaW1wb3J0YW50O3JpZ2h0OjUlIWltcG9ydGFudDtsZWZ0OjUlIWltcG9ydGFudDt3aWR0aDo5MCUhaW1wb3J0YW50O21pbi13aWR0aDowIWltcG9ydGFudDtib3gtc2l6aW5nOmJveC1ib3ghaW1wb3J0YW50O2Rpc3BsYXk6Z3JpZCFpbXBvcnRhbnQ7Z3JpZC10ZW1wbGF0ZS1jb2x1bW5zOjFmciAxZnIhaW1wb3J0YW50O2dhcDo4cHghaW1wb3J0YW50O3BhZGRpbmc6MTJweCFpbXBvcnRhbnQ7dHJhbnNmb3JtOm5vbmUhaW1wb3J0YW50O2JvcmRlci1yYWRpdXM6MTZweCFpbXBvcnRhbnQ7YmFja2dyb3VuZDpyZ2JhKDMsMTQsMjcsLjk0KSFpbXBvcnRhbnQ7YmFja2Ryb3AtZmlsdGVyOmJsdXIoMTZweCkhaW1wb3J0YW50Oy13ZWJraXQtYmFja2Ryb3AtZmlsdGVyOmJsdXIoMTZweCkhaW1wb3J0YW50O2JveC1zaGFkb3c6MCAxNHB4IDM2cHggcmdiYSgwLDAsMCwuMjgpIWltcG9ydGFudDt9CiAgLmhlcm8gLmh1ZC1kZXB0aD5kaXZ7bWluLXdpZHRoOjAhaW1wb3J0YW50O292ZXJmbG93OmhpZGRlbSFpbXBvcnRhbnQ7fQogIC5oZXJvIC5odWQtZGVwdGggc3Bhbntmb250LXNpemU6MTBweCFpbXBvcnRhbnQ7d2hpdGUtc3BhY2U6bm93cmFwIWltcG9ydGFudDt9CiAgLmhlcm8gLmhudC1kZXB0aCBie2ZvbnQtc2l6ZToxNXB4IWltcG9ydGFudDtsaW5lLWhlaWdodDoxLjUhaW1wb3J0YW50O3doaXRlLXNwYWNlOm5vd3JhcCFpbXBvcnRhbnQ7b3ZlcmZsb3c6dmlzaWJsZSFpbXBvcnRhbnQ7fQogIC5oZXJvIC5jYWxlbmRhci1saXZle2dyaWQtY29sdW1uOjEvLTEhaW1wb3J0YW50O30KICAuaGVybyAuY2FsZW5kYXItbGl2ZSBzdHJvbmd7Zm9udC1zaXplOjE2cHghaW1wb3J0YW50O2xpbmUtaGVpZ2h0OjEuNSFpbXBvcnRhbnQ7fQogIC5oZXJvIC5jYWxlbmRhci1saXZlIHNtYWxse2ZvbnQtc2l6ZToxMXB4IWltcG9ydGFudDt9Cn0KQG1lZGlhKG1heC13aWR0aDo2MDBweCl7CiAgLmhlcm8gLnNjZW5le2hlaWdodDo1NDhweCFpbXBvcnRhbnQ7bWluLWhlaWdodDo1NDhweCFpbXBvcnRhbnQ7fQogIC5oZXJvIC5oZXJvLXBob3RvLXdyYXB7aGVpZ2h0OjM1MHB4IWltcG9ydGFudH0KICAuaGVybyAuaHVkLWRlcHRoe3RvcDozNjZweCFpbXBvcnRhbnQ7fQogICN1cmRlckFjdGlvbnMgLmJ0bntmbGV4LWJhc2lzOjEwMCU7fQp9Ci8qIFRvdWNoIGZlZWRiYWNrIG9ubHk6IG5vIHBlcnNpc3RlbnQgbW9iaWxlIGhvdmVyLiAqLwpAbWVkaWEoaG92ZXI6bm9uZSl7CiAgLmJ0bjphY3RpdmUsLnRleHQtYnRuOmFjdGl2ZSwucHJvamVjdDphY3RpdmUsLmdsYXNzLWNhcmQ6YWN0aXZlLC5jb250YWN0LWxpbmtzIGE6YWN0aXZle3RyYW5zZm9ybTp0cmFuc2xhdGVZKDFweCkhaW1wb3J0YW50O2JveC1zaGFkb3c6MCAwIDAgMnB4IHJnYmEoMjIwLDM4LDM4LC4xNiksMCAwIDE4cHggcmdiYSgyMjAsMzgsMzgsLjIyKSFpbXBvcnRhbnQ7dHJhbnNpdGlvbjpib3gtc2hhZG93IC4wOHMgZWFzZSx0cmFuc2Zvcm0gLjA4cyBlYXNlIWltcG9ydGFudDt9Cn0K' | base64 -d > "$PROJECT/app/src/main/assets/css/stability-v6.css"
-
-          python3 -c "from pathlib import Path; p=Path('$PROJECT/app/src/main/assets/index.html'); s=p.read_text(encoding='utf-8'); s=s.replace('<link rel=\"stylesheet\" href=\"css/red-effects.css\">','<link rel=\"stylesheet\" href=\"css/red-effects.css\"><link rel=\"stylesheet\" href=\"css/stability-v6.css\">'); s=s.replace('<script src=\"js/config.js\"></script><script src=\"js/app.js\"></script>','<script src=\"js/config.js\"></script><script src=\"js/app.js\"></script><script src=\"js/stability-v6.js\"></script>'); p.write_text(s,encoding='utf-8')"
-
-          test -s "$PROJECT/app/src/main/assets/js/stability-v6.js"
-          test -s "$PROJECT/app/src/main/assets/css/stability-v6.css"
-
-          grep -q "stability-v6.css" "$PROJECT/app/src/main/assets/index.html"
-          grep -q "stability-v6.js" "$PROJECT/app/src/main/assets/index.html"
-
-          echo "PATCH APPLIED SUCCESSFULLY"
-
-      - name: Verify Android project
-        shell: bash
-        run: |
-          set -euo pipefail
+          set -e
 
           test -f "$PROJECT/settings.gradle"
           test -f "$PROJECT/app/build.gradle"
           test -f "$PROJECT/app/src/main/AndroidManifest.xml"
-          test -f "$PROJECT/app/src/main/java/com/hmstudio/app/MainActivity.java"
 
-          echo "======================================"
           echo "ANDROID PROJECT OK"
-          echo "======================================"
 
           cd "$PROJECT"
+
           gradle --version
 
-      - name: Build debug APK
+      - name: Apply V6 mobile stability patch
         shell: bash
         run: |
-          set -euo pipefail
+          set -e
 
-          echo "======================================"
-          echo "BUILDING APK"
-          echo "======================================"
+          INDEX="$PROJECT/app/src/main/assets/index.html"
+          JS="$PROJECT/app/src/main/assets/js/hm-v6-stability.js"
+          CSS="$PROJECT/app/src/main/assets/css/hm-v6-stability.css"
+
+          if [ ! -f "$INDEX" ]; then
+            echo "ERROR: index.html not found"
+            exit 1
+          fi
+
+          mkdir -p "$(dirname "$JS")"
+          mkdir -p "$(dirname "$CSS")"
+
+          cat > "$JS" <<'JAVASCRIPT'
+(function () {
+  'use strict';
+
+  function getLang() {
+    return document.documentElement.lang || 'fa';
+  }
+
+  function updateStableClock() {
+    var now = new Date();
+    var lang = getLang();
+
+    var locale =
+      lang === 'fa'
+        ? 'fa-IR-u-ca-persian'
+        : lang === 'ar'
+          ? 'ar-SA-u-ca-islamic'
+          : 'en-US';
+
+    var time = new Intl.DateTimeFormat(locale, {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).format(now);
+
+    var date = new Intl.DateTimeFormat(locale, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    }).format(now);
+
+    var clock = document.getElementById('hmStableClock');
+
+    if (!clock) {
+      clock = document.createElement('div');
+      clock.id = 'hmStableClock';
+      clock.className = 'hm-stable-clock';
+
+      var hero =
+        document.querySelector('.hero') ||
+        document.querySelector('.hud-depth') ||
+        document.body;
+
+      hero.appendChild(clock);
+    }
+
+    clock.textContent = time + '  ·  ' + date;
+  }
+
+  function hideProblematicLayers() {
+    var selectors = [
+      '.hud-depth',
+      '.scene .screen',
+      '.scene .glass-console',
+      '.scene .depth-layer',
+      '.scene .holo-layer'
+    ];
+
+    document.querySelectorAll(selectors.join(',')).forEach(function (element) {
+      element.classList.add('hm-static-hidden');
+    });
+  }
+
+  function installOrderForm() {
+    var form = document.getElementById('projectForm');
+
+    if (!form || form.dataset.hmStableInstalled === '1') {
+      return;
+    }
+
+    form.dataset.hmStableInstalled = '1';
+
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+
+      var data = Object.fromEntries(
+        new FormData(form).entries()
+      );
+
+      var message = [
+        'HM Studio - Project Request',
+        '------------------------------',
+        'First name: ' + (data.firstName || data.firstname || ''),
+        'Last name: ' + (data.lastName || data.lastname || ''),
+        'Email: ' + (data.email || ''),
+        'Phone: ' + (data.phone || ''),
+        'Project: ' + (data.projectType || data.project || ''),
+        'Budget: ' + (data.budget || ''),
+        'Location: ' + (data.location || ''),
+        'Description: ' + (data.description || '')
+      ].join('\n');
+
+      var actions = document.getElementById('hmOrderActions');
+
+      if (!actions) {
+        actions = document.createElement('div');
+        actions.id = 'hmOrderActions';
+        actions.className = 'hm-order-actions';
+        form.appendChild(actions);
+      }
+
+      actions.innerHTML = '';
+
+      var lang = getLang();
+
+      var labels =
+        lang === 'fa'
+          ? ['واتساپ', 'پیامک', 'تلگرام', 'ایمیل']
+          : lang === 'ar'
+            ? ['واتساب', 'SMS', 'تلغرام', 'البريد']
+            : ['WhatsApp', 'SMS', 'Telegram', 'Email'];
+
+      var phone = '+989399020094';
+      var email = 'm74981819@gmail.com';
+
+      function addButton(label, callback) {
+        var button = document.createElement('button');
+
+        button.type = 'button';
+        button.className = 'hm-send';
+        button.textContent = label;
+
+        button.addEventListener('click', callback);
+
+        actions.appendChild(button);
+      }
+
+      addButton(labels[0], function () {
+        window.location.href =
+          'https://wa.me/' +
+          phone +
+          '?text=' +
+          encodeURIComponent(message);
+      });
+
+      addButton(labels[1], function () {
+        window.location.href =
+          'sms:' +
+          phone +
+          '?body=' +
+          encodeURIComponent(message);
+      });
+
+      addButton(labels[2], function () {
+        window.location.href =
+          'https://t.me/share/url?url=&text=' +
+          encodeURIComponent(message);
+      });
+
+      addButton(labels[3], function () {
+        window.location.href =
+          'mailto:' +
+          email +
+          '?subject=' +
+          encodeURIComponent('HM Studio Project Request') +
+          '&body=' +
+          encodeURIComponent(message);
+      });
+
+      actions.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest'
+      });
+    });
+  }
+
+  function boot() {
+    hideProblematicLayers();
+    installOrderForm();
+    updateStableClock();
+
+    setInterval(updateStableClock, 1000);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener(
+      'DOMContentLoaded',
+      boot,
+      { once: true }
+    );
+  } else {
+    boot();
+  }
+})();
+JAVASCRIPT
+
+          cat > "$CSS" <<'STYLES'
+.hm-stable-clock {
+  display: block !important;
+  position: relative !important;
+  z-index: 50 !important;
+  width: min(90%, 420px) !important;
+  box-sizing: border-box !important;
+  margin: 10px auto 0 !important;
+  padding: 10px 12px !important;
+  border-radius: 14px !important;
+  background: rgba(8, 12, 18, 0.94) !important;
+  color: #ffffff !important;
+  text-align: center !important;
+  font: 600 15px/1.5 system-ui, sans-serif !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  animation: none !important;
+  transition: none !important;
+  white-space: normal !important;
+}
+
+.hm-static-hidden {
+  animation: none !important;
+  transition: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.hm-order-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  width: 100% !important;
+  margin-top: 12px !important;
+}
+
+.hm-send {
+  min-height: 46px !important;
+  flex: 1 1 140px !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  padding: 10px 14px !important;
+  font: 700 14px/1.3 system-ui, sans-serif !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+}
+
+@media (hover: none) {
+  .hm-send:active {
+    transform: translateY(1px);
+    box-shadow:
+      0 0 0 2px rgba(220, 38, 38, 0.18),
+      0 0 16px rgba(220, 38, 38, 0.22);
+  }
+}
+
+@media (max-width: 600px) {
+  .hm-stable-clock {
+    font-size: 14px !important;
+  }
+
+  .hm-order-actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .hm-send {
+    width: 100% !important;
+  }
+}
+STYLES
+
+          python3 - <<'PY'
+from pathlib import Path
+
+p = Path("PROJECT_PLACEHOLDER")
+PY
+
+          python3 -c "
+from pathlib import Path
+p=Path('$INDEX')
+s=p.read_text(encoding='utf-8')
+
+css='css/hm-v6-stability.css'
+js='js/hm-v6-stability.js'
+
+if css not in s:
+    s=s.replace('</head>', '<link rel=\"stylesheet\" href=\"'+css+'\">\\n</head>', 1)
+
+if js not in s:
+    s=s.replace('</body>', '<script src=\"'+js+'\"></script>\\n</body>', 1)
+
+p.write_text(s, encoding='utf-8')
+"
+
+          grep -q "hm-v6-stability.css" "$INDEX"
+          grep -q "hm-v6-stability.js" "$INDEX"
+
+          echo "V6 PATCH OK"
+
+      - name: Build APK
+        shell: bash
+        run: |
+          set -e
 
           cd "$PROJECT"
+
+          echo "========================================"
+          echo "BUILD START"
+          echo "========================================"
 
           gradle :app:assembleDebug \
             --no-daemon \
@@ -123,33 +398,36 @@ jobs:
             --warning-mode all \
             --console=plain
 
+          echo "========================================"
+          echo "BUILD FINISHED"
+          echo "========================================"
+
       - name: Verify APK
         shell: bash
         run: |
-          set -euo pipefail
+          set -e
 
-          APK="$(find "$PROJECT/app/build/outputs/apk" \
+          APK=$(find "$PROJECT/app/build/outputs/apk" \
             -type f \
             -name '*.apk' \
-            -print -quit)"
+            -print -quit)
 
           if [ -z "$APK" ]; then
-            echo "======================================"
+            echo "========================================"
             echo "ERROR: APK NOT FOUND"
-            echo "======================================"
+            echo "========================================"
 
             find "$PROJECT/app/build" \
-              -maxdepth 8 \
               -type f \
               -print \
-              | sort || true
+              | sort
 
             exit 1
           fi
 
-          echo "======================================"
+          echo "========================================"
           echo "APK FOUND"
-          echo "======================================"
+          echo "========================================"
           echo "$APK"
 
           mkdir -p apk-output
