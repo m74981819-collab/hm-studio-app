@@ -11,47 +11,38 @@ permissions:
 
 jobs:
   build:
-    name: Build HM Studio APK V6 FINAL
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle
+      - name: Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
 
       - name: Extract V6
-        shell: bash
         run: |
           set -e
           rm -rf extracted
-          mkdir -p extracted
-          test -f hm-studio-app-v6-corrected.zip
+          mkdir extracted
           unzip -o hm-studio-app-v6-corrected.zip -d extracted
-          echo "V6 extracted"
 
-      - name: Locate Project
-        shell: bash
+      - name: Find Android Project
         run: |
           set -e
 
-          SETTINGS=$(find extracted -type f -name "settings.gradle" -print -quit)
+          SETTINGS=$(find extracted -type f \( -name settings.gradle -o -name settings.gradle.kts \) | head -1)
 
           if [ -z "$SETTINGS" ]; then
-            SETTINGS=$(find extracted -type f -name "settings.gradle.kts" -print -quit)
-          fi
-
-          if [ -z "$SETTINGS" ]; then
-            echo "ERROR: Gradle settings file not found"
+            echo "settings.gradle not found"
             exit 1
           fi
 
@@ -60,11 +51,9 @@ jobs:
           echo "PROJECT=$PROJECT"
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
 
-      - name: Verify Project
-        shell: bash
+      - name: Check Project
         run: |
           set -e
-
           cd "$PROJECT"
 
           test -d app
@@ -78,507 +67,68 @@ jobs:
           echo "Gradle:"
           gradle --version
 
-      - name: Apply Safe Mobile Fix
-        shell: bash
+      - name: Apply Mobile Stability Fix
         run: |
           set -e
-
           cd "$PROJECT"
 
-          INDEX=$(find app/src/main/assets -type f -name "index.html" -print -quit)
+          INDEX=$(find app/src/main/assets -type f -name index.html | head -1)
 
           if [ -z "$INDEX" ]; then
-            echo "ERROR: index.html not found"
+            echo "index.html not found"
             exit 1
           fi
 
-          echo "Patching:"
-          echo "$INDEX"
-
-          python3 - "$INDEX" <<'PY'
-import sys
-from pathlib import Path
-
-p = Path(sys.argv[1])
-html = p.read_text(encoding="utf-8", errors="ignore")
-
-css = r'''
-<style id="hm-v6-final-stability">
-/* HM STUDIO V6 - stable mobile UI */
-
-html,
-body {
-  overflow-x: hidden !important;
-  -webkit-tap-highlight-color: transparent;
-}
-
-/* Remove blinking/flickering from time/info areas */
-[class*="clock"],
-[class*="time"],
-[class*="date"],
-[class*="datetime"],
-[id*="clock"],
-[id*="time"],
-[id*="date"] {
-  animation: none !important;
-  -webkit-animation: none !important;
-  transition: none !important;
-  -webkit-transition: none !important;
-  transform: none !important;
-  filter: none !important;
-  will-change: auto !important;
-}
-
-/* Keep small information text stable */
-[class*="clock"],
-[class*="time"],
-[class*="date"],
-[id*="clock"],
-[id*="time"],
-[id*="date"] {
-  line-height: 1.5 !important;
-  min-height: 24px;
-}
-
-/* Remove permanent hover movement on touch devices */
-@media (hover: none) and (pointer: coarse) {
-  a:hover,
-  button:hover,
-  [role="button"]:hover,
-  .card:hover,
-  .project:hover,
-  .service:hover {
-    transform: none !important;
-    filter: none !important;
-  }
-}
-
-/* Short red touch effect */
-.hm-v6-touch {
-  animation: hm-v6-red-touch .22s ease-out !important;
-}
-
-@keyframes hm-v6-red-touch {
-  0% {
-    box-shadow: 0 0 0 rgba(255,0,0,0);
-  }
-
-  45% {
-    box-shadow:
-      0 0 10px rgba(255,0,0,.40),
-      0 0 20px rgba(255,0,0,.18);
-  }
-
-  100% {
-    box-shadow: 0 0 0 rgba(255,0,0,0);
-  }
-}
-
-/* Order sending panel */
-#hm-v6-send-panel {
-  display: none;
-  position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: calc(12px + env(safe-area-inset-bottom));
-  z-index: 2147483647;
-  padding: 14px;
-  border-radius: 18px;
-  background: rgba(18,18,22,.97);
-  color: white;
-  box-shadow: 0 12px 40px rgba(0,0,0,.45);
-  border: 1px solid rgba(255,255,255,.15);
-}
-
-#hm-v6-send-panel.show {
-  display: block;
-}
-
-#hm-v6-send-panel .title {
-  text-align: center;
-  font-weight: 700;
-  margin-bottom: 10px;
-}
-
-#hm-v6-send-panel .grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-#hm-v6-send-panel button {
-  min-height: 44px;
-  border: 0;
-  border-radius: 12px;
-  background: rgba(255,255,255,.10);
-  color: white;
-  font-weight: 700;
-}
-
-#hm-v6-send-panel .close {
-  width: 100%;
-  margin-top: 8px;
-}
-</style>
-'''
-
-js = r'''
-<script id="hm-v6-final-stability-js">
-(function () {
-  "use strict";
-
-  function getContactLinks() {
-    var links = document.querySelectorAll("a[href]");
-    var result = {
-      whatsapp: "",
-      sms: "",
-      telegram: "",
-      email: ""
-    };
-
-    Array.prototype.forEach.call(links, function (a) {
-      var h = String(a.getAttribute("href") || "");
-      var l = h.toLowerCase();
-
-      if (!result.whatsapp &&
-          (l.indexOf("wa.me/") >= 0 ||
-           l.indexOf("whatsapp") >= 0)) {
-        result.whatsapp = h;
-      }
-
-      if (!result.sms && l.indexOf("sms:") === 0) {
-        result.sms = h;
-      }
-
-      if (!result.telegram &&
-          (l.indexOf("t.me/") >= 0 ||
-           l.indexOf("telegram") >= 0)) {
-        result.telegram = h;
-      }
-
-      if (!result.email && l.indexOf("mailto:") === 0) {
-        result.email = h;
-      }
-    });
-
-    return result;
-  }
-
-  function formMessage(form) {
-    var lines = [
-      "سلام، سفارش جدید از HM Studio",
-      "--------------------"
-    ];
-
-    var fields = form.querySelectorAll(
-      "input, textarea, select"
-    );
-
-    Array.prototype.forEach.call(fields, function (field) {
-      if (field.disabled) return;
-
-      var type = String(field.type || "").toLowerCase();
-
-      if (
-        type === "submit" ||
-        type === "button" ||
-        type === "reset" ||
-        type === "hidden"
-      ) {
-        return;
-      }
-
-      var value = String(field.value || "").trim();
-
-      if (!value) return;
-
-      var label =
-        field.getAttribute("aria-label") ||
-        field.getAttribute("placeholder") ||
-        field.getAttribute("name") ||
-        field.id ||
-        "اطلاعات";
-
-      lines.push(label + ": " + value);
-    });
-
-    lines.push("--------------------");
-    lines.push("ارسال از اپلیکیشن HM Studio");
-
-    return lines.join("\n");
-  }
-
-  function makeUrl(type, message, links) {
-    var encoded = encodeURIComponent(message);
-
-    if (type === "whatsapp") {
-      if (!links.whatsapp) return "";
-
-      var number = links.whatsapp.match(
-        /wa\.me\/([0-9]+)/i
-      );
-
-      if (number) {
-        return "https://wa.me/" +
-          number[1] +
-          "?text=" +
-          encoded;
-      }
-
-      if (links.whatsapp.indexOf("?") >= 0) {
-        return links.whatsapp + "&text=" + encoded;
-      }
-
-      return links.whatsapp + "?text=" + encoded;
-    }
-
-    if (type === "sms") {
-      if (!links.sms) return "";
-
-      var sms = links.sms.replace(/^sms:/i, "");
-      sms = sms.split("?")[0];
-
-      return "sms:" + sms + "?body=" + encoded;
-    }
-
-    if (type === "email") {
-      if (!links.email) return "";
-
-      var email = links.email.replace(/^mailto:/i, "");
-      email = email.split("?")[0];
-
-      return "mailto:" +
-        email +
-        "?subject=" +
-        encodeURIComponent("سفارش جدید HM Studio") +
-        "&body=" +
-        encoded;
-    }
-
-    if (type === "telegram") {
-      return links.telegram || "";
-    }
-
-    return "";
-  }
-
-  function openUrl(url) {
-    if (!url) return;
-
-    window.location.href = url;
-  }
-
-  function createPanel() {
-    var old = document.getElementById("hm-v6-send-panel");
-
-    if (old) return old;
-
-    var panel = document.createElement("div");
-
-    panel.id = "hm-v6-send-panel";
-
-    panel.innerHTML =
-      '<div class="title">ارسال سفارش</div>' +
-      '<div class="grid">' +
-      '<button type="button" data-send="whatsapp">WhatsApp</button>' +
-      '<button type="button" data-send="sms">پیامک</button>' +
-      '<button type="button" data-send="telegram">Telegram</button>' +
-      '<button type="button" data-send="email">Email</button>' +
-      '</div>' +
-      '<button type="button" class="close">بستن</button>';
-
-    document.body.appendChild(panel);
-
-    return panel;
-  }
-
-  function setupForms() {
-    var forms = document.querySelectorAll("form");
-
-    Array.prototype.forEach.call(forms, function (form) {
-      if (form.dataset.hmV6Ready === "1") return;
-
-      var fields = form.querySelectorAll(
-        "input, textarea, select"
-      );
-
-      if (fields.length < 2) return;
-
-      form.dataset.hmV6Ready = "1";
-
-      form.addEventListener("submit", function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-
-        var message = formMessage(form);
-        var links = getContactLinks();
-        var panel = createPanel();
-
-        panel.classList.add("show");
-
-        var buttons = panel.querySelectorAll(
-          "[data-send]"
-        );
-
-        Array.prototype.forEach.call(buttons, function (button) {
-          var type = button.getAttribute("data-send");
-          var url = makeUrl(type, message, links);
-
-          button.disabled = !url;
-          button.style.opacity = url ? "1" : ".35";
-
-          button.onclick = function () {
-            if (url) {
-              openUrl(url);
-            }
-          };
-        });
-
-        var close = panel.querySelector(".close");
-
-        if (close) {
-          close.onclick = function () {
-            panel.classList.remove("show");
-          };
-        }
-      }, true);
-    });
-  }
-
-  function setupTouchEffect() {
-    document.addEventListener("pointerdown", function (event) {
-      var target = event.target;
-
-      if (!(target instanceof Element)) return;
-
-      var el = target.closest(
-        "button, a, [role='button'], .card, .project, .service"
-      );
-
-      if (!el) return;
-
-      el.classList.remove("hm-v6-touch");
-
-      void el.offsetWidth;
-
-      el.classList.add("hm-v6-touch");
-
-      setTimeout(function () {
-        el.classList.remove("hm-v6-touch");
-      }, 260);
-    }, { passive: true });
-  }
-
-  function start() {
-    setupForms();
-    setupTouchEffect();
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", start, {
-      once: true
-    });
-  } else {
-    start();
-  }
-
-  setTimeout(setupForms, 800);
-  setTimeout(setupForms, 1800);
-
-})();
-</script>
-'''
-
-if "hm-v6-final-stability" not in html:
-    if "</head>" in html:
-        html = html.replace("</head>", css + "\n</head>", 1)
-    else:
-        html = css + html
-
-if "hm-v6-final-stability-js" not in html:
-    if "</body>" in html:
-        html = html.replace("</body>", js + "\n</body>", 1)
-    else:
-        html += js
-
-p.write_text(html, encoding="utf-8")
-
-print("FINAL PATCH APPLIED")
-print("FILE:", p)
-print("SIZE:", p.stat().st_size)
-PY
-
-          echo "Patch completed"
-
-      - name: Validate Patch
-        shell: bash
+          echo "Patching $INDEX"
+
+          python3 -c 'from pathlib import Path; import sys; p=Path(sys.argv[1]); s=p.read_text(encoding="utf-8",errors="ignore"); css="""<style id="hm-v6-stable-fix">
+html,body{overflow-x:hidden!important;-webkit-tap-highlight-color:transparent}
+[class*="clock"],[class*="time"],[class*="date"],[class*="datetime"],[id*="clock"],[id*="time"],[id*="date"]{animation:none!important;-webkit-animation:none!important;transition:none!important;-webkit-transition:none!important;transform:none!important;filter:none!important;will-change:auto!important;opacity:1!important}
+@media(hover:none) and (pointer:coarse){a:hover,button:hover,[role="button"]:hover,.card:hover,.project:hover,.service:hover{transform:none!important;filter:none!important}}
+.hm-v6-touch{animation:hm-v6-red-touch .22s ease-out!important}
+@keyframes hm-v6-red-touch{0%{box-shadow:0 0 0 rgba(255,0,0,0)}45%{box-shadow:0 0 10px rgba(255,0,0,.4),0 0 20px rgba(255,0,0,.18)}100%{box-shadow:0 0 0 rgba(255,0,0,0)}}
+#hm-v6-send-panel{display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:2147483647;padding:14px;border-radius:18px;background:rgba(18,18,22,.97);color:white;box-shadow:0 12px 40px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.15)}
+#hm-v6-send-panel.show{display:block}
+#hm-v6-send-panel .title{text-align:center;font-weight:700;margin-bottom:10px}
+#hm-v6-send-panel .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#hm-v6-send-panel button{min-height:44px;border:0;border-radius:12px;background:rgba(255,255,255,.1);color:white;font-weight:700}
+#hm-v6-send-panel .close{width:100%;margin-top:8px}
+</style>"""; js="""<script id="hm-v6-stable-js">(function(){function links(){var a=document.querySelectorAll("a[href]"),r={whatsapp:"",sms:"",telegram:"",email:""};Array.prototype.forEach.call(a,function(x){var h=String(x.getAttribute("href")||""),l=h.toLowerCase();if(!r.whatsapp&&(l.indexOf("wa.me/")>=0||l.indexOf("whatsapp")>=0))r.whatsapp=h;if(!r.sms&&l.indexOf("sms:")===0)r.sms=h;if(!r.telegram&&(l.indexOf("t.me/")>=0||l.indexOf("telegram")>=0))r.telegram=h;if(!r.email&&l.indexOf("mailto:")===0)r.email=h});return r}function msg(f){var x=["سلام، سفارش جدید از HM Studio","--------------------"];Array.prototype.forEach.call(f.querySelectorAll("input,textarea,select"),function(e){var t=String(e.type||"").toLowerCase();if(e.disabled||t==="submit"||t==="button"||t==="reset"||t==="hidden"||!String(e.value||"").trim())return;var n=e.getAttribute("aria-label")||e.getAttribute("placeholder")||e.getAttribute("name")||e.id||"اطلاعات";x.push(n+": "+String(e.value).trim())});x.push("--------------------");x.push("ارسال از اپلیکیشن HM Studio");return x.join("\\n")}function url(t,m,l){var q=encodeURIComponent(m);if(t==="whatsapp"&&l.whatsapp){var n=l.whatsapp.match(/wa\\.me\\/([0-9]+)/i);return n?"https://wa.me/"+n[1]+"?text="+q:l.whatsapp+(l.whatsapp.indexOf("?")>=0?"&":"?")+"text="+q}if(t==="sms"&&l.sms){var s=l.sms.replace(/^sms:/i,"").split("?")[0];return"sms:"+s+"?body="+q}if(t==="email"&&l.email){var e=l.email.replace(/^mailto:/i,"").split("?")[0];return"mailto:"+e+"?subject="+encodeURIComponent("سفارش جدید HM Studio")+"&body="+q}if(t==="telegram")return l.telegram||"";return""}function panel(){var p=document.getElementById("hm-v6-send-panel");if(p)return p;p=document.createElement("div");p.id="hm-v6-send-panel";p.innerHTML='<div class="title">ارسال سفارش</div><div class="grid"><button type="button" data-send="whatsapp">WhatsApp</button><button type="button" data-send="sms">پیامک</button><button type="button" data-send="telegram">Telegram</button><button type="button" data-send="email">Email</button></div><button type="button" class="close">بستن</button>';document.body.appendChild(p);return p}function forms(){document.querySelectorAll("form").forEach(function(f){if(f.dataset.hm==="1"||f.querySelectorAll("input,textarea,select").length<2)return;f.dataset.hm="1";f.addEventListener("submit",function(e){e.preventDefault();e.stopPropagation();var m=msg(f),l=links(),p=panel();p.classList.add("show");p.querySelectorAll("[data-send]").forEach(function(b){var u=url(b.getAttribute("data-send"),m,l);b.disabled=!u;b.style.opacity=u?"1":".35";b.onclick=function(){if(u)location.href=u}});p.querySelector(".close").onclick=function(){p.classList.remove("show")}},true)})}document.addEventListener("pointerdown",function(e){var x=e.target.closest&&e.target.closest("button,a,[role=button],.card,.project,.service");if(!x)return;x.classList.remove("hm-v6-touch");void x.offsetWidth;x.classList.add("hm-v6-touch");setTimeout(function(){x.classList.remove("hm-v6-touch")},260)},{passive:true});if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",forms,{once:true});else forms();setTimeout(forms,800);setTimeout(forms,1800)})();</script>"""; s=s if "hm-v6-stable-fix" in s else (s.replace("</head>",css+"</head>",1) if "</head>" in s else css+s); s=s if "hm-v6-stable-js" in s else (s.replace("</body>",js+"</body>",1) if "</body>" in s else s+js); p.write_text(s,encoding="utf-8")' "$INDEX"
+
+          echo "Mobile stability and order-form patch applied"
+
+      - name: Build APK
         run: |
           set -e
-
           cd "$PROJECT"
-
-          INDEX=$(find app/src/main/assets -type f -name "index.html" -print -quit)
-
-          test -n "$INDEX"
-
-          grep -q "hm-v6-final-stability" "$INDEX"
-          grep -q "hm-v6-final-stability-js" "$INDEX"
-
-          echo "Patch validation OK"
-
-      - name: Build Debug APK
-        shell: bash
-        run: |
-          set -e
-
-          cd "$PROJECT"
-
-          echo "======================================"
-          echo "BUILDING APK"
-          echo "======================================"
 
           gradle :app:assembleDebug \
             --no-daemon \
             --stacktrace \
             --console=plain
 
-          echo ""
-          echo "APK FILES:"
-          find . -type f -name "*.apk" -print
-
-      - name: Verify APK
-        shell: bash
+      - name: Find APK
         run: |
           set -e
-
           cd "$PROJECT"
 
-          APK=$(find . -type f -name "*.apk" -print -quit)
+          APK=$(find . -type f -name "*.apk" | head -1)
 
           if [ -z "$APK" ]; then
-            echo "ERROR: APK NOT GENERATED"
+            echo "APK NOT FOUND"
+            find . -type d -name build
             exit 1
           fi
 
-          echo "APK FOUND:"
-          echo "$APK"
+          echo "APK=$APK"
+          echo "APK=$APK" >> "$GITHUB_ENV"
 
-      - name: Copy APK
-        shell: bash
+      - name: Prepare APK
         run: |
           set -e
-
-          cd "$PROJECT"
-
-          APK=$(find . -type f -name "*.apk" -print -quit)
-
-          mkdir -p "$GITHUB_WORKSPACE/apk-output"
-
-          cp "$APK" \
-            "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v6-final-debug.apk"
-
-          ls -lh \
-            "$GITHUB_WORKSPACE/apk-output/hm-studio-app-v6-final-debug.apk"
+          mkdir -p apk-output
+          cp "$PROJECT/$APK" apk-output/hm-studio-app-v6-final-debug.apk
+          ls -lh apk-output/hm-studio-app-v6-final-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
