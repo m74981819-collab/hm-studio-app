@@ -32,12 +32,12 @@ jobs:
           ZIP="$(find . -type f -name 'hm-studio-app-v6-corrected.zip' -print -quit)"
 
           if [ -z "$ZIP" ]; then
-            echo "ERROR: hm-studio-app-v6-corrected.zip NOT FOUND"
+            echo "ERROR: V6 ZIP NOT FOUND"
+            find . -type f -name '*.zip' -print
             exit 1
           fi
 
-          echo "V6 ZIP FOUND:"
-          echo "$ZIP"
+          echo "V6 ZIP: $ZIP"
 
           rm -rf v6-project
           mkdir -p v6-project
@@ -52,33 +52,26 @@ jobs:
             exit 1
           fi
 
-          if [ ! -f "$PROJECT/app/build.gradle" ]; then
-            echo "ERROR: app/build.gradle NOT FOUND"
-            exit 1
-          fi
-
-          if [ ! -f "$PROJECT/app/src/main/AndroidManifest.xml" ]; then
-            echo "ERROR: AndroidManifest.xml NOT FOUND"
-            exit 1
-          fi
+          test -f "$PROJECT/app/build.gradle"
+          test -f "$PROJECT/app/src/main/AndroidManifest.xml"
+          test -f "$PROJECT/app/src/main/assets/index.html"
 
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
 
-          echo "========================================"
-          echo "V6 PROJECT"
+          echo "=============================="
+          echo "ANDROID PROJECT:"
           echo "$PROJECT"
-          echo "========================================"
+          echo "=============================="
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
 
-      - name: Check Android project
+      - name: Verify Android Project
         shell: bash
         run: |
           set -e
-
           cd "$PROJECT"
 
           echo "Gradle version:"
@@ -88,856 +81,41 @@ jobs:
           test -f app/build.gradle
           test -f app/src/main/AndroidManifest.xml
 
-          echo "ANDROID PROJECT CHECK PASSED"
+          echo "ANDROID PROJECT OK"
 
-      - name: Create final mobile JavaScript
+      - name: Create Mobile JavaScript
         shell: bash
         run: |
           set -e
 
           mkdir -p "$PROJECT/app/src/main/assets/js"
 
-          cat > "$PROJECT/app/src/main/assets/js/hm-v6-final.js" <<'JAVASCRIPT'
-(function () {
-  "use strict";
+          echo 'KGZ1bmN0aW9uKCl7CiJ1c2Ugc3RyaWN0IjsKZnVuY3Rpb24gdHh0KHMpe3JldHVybiBTdHJpbmcoc3x8IiIpLnJlcGxhY2UoL1xzKy9nLCIgIikudHJpbSgpO30KZnVuY3Rpb24gbGlua3MoKXsKIGxldCB3YT0iIixtYWlsPSIiOwogZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgiYVtocmVmXSIpLmZvckVhY2goYT0+ewogIGNvbnN0IGg9YS5nZXRBdHRyaWJ1dGUoImhyZWYiKXx8IiI7CiAgaWYoIXdhJiYvd2FcLm1lfHdoYXRzYXBwL2kudGVzdChoKSl3YT1oOwogIGlmKCFtYWlsJiYvXm1haWx0bzo/iLnRlc3QoaCkpIG1haWw9aC5yZXBsYWNlKC9ebWFpbHRvOi9pLCIiKS5zcGxpdCgiPyIpWzBdOwogfSk7CiByZXR1cm4ge3dhLG1haWx9Owp9CmZ1bmN0aW9uIGNvbGxlY3Qocm9vdCl7CiBjb25zdCBvdXQ9W107CiByb290LnF1ZXJ5U2VsZWN0b3JBbGwoImlucHV0LHNlbGVjdCx0ZXh0YXJlYSIpLmZvckVhY2goZT0+ewogIGlmKGUuZGlzYWJsZWR8fGUudHlwZT09PSJoaWRkZW4iKXJldHVybjsKICBjb25zdCB2PXR4dChlLnZhbHVlKTtpZighdilyZXR1cm47CiAgY29uc3Qgbj10eHQoZS5nZXRBdHRyaWJ1dGUoImFyaWEtbGFiZWwiKXx8ZS5nZXRBdHRyaWJ1dGUoIm5hbWUiKXx8ZS5nZXRBdHRyaWJ1dGUoInBsYWNlaG9sZGVyIil8fCIiKTsKICBvdXQucHVzaChuP24rIjogIit2OnYpOwogfSk7CiByZXR1cm4gb3V0LmpvaW4oIlxuIik7Cn0KZnVuY3Rpb24gcGFuZWwobWVzc2FnZSl7CiBjb25zdCBvbGQ9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoImhtLXNlbmQtcGFuZWwiKTtpZihvbGQpb2xkLnJlbW92ZSgpOwogY29uc3QgcD1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCJkaXYiKTtwLmlkPSJobS1zZW5kLXBhbmVsIjtwLmRpcj0icnRsIjsKIHAuaW5uZXJIVE1MPSc8ZGl2IGNsYXNzPSJobS1zZW5kLXRpdGxlIj7Yp9ix2LPYp9mEINiv2LHYrtmI2KfYs9iqINm+2LHZiNqY2Yc8L2Rpdj48ZGl2IGNsYXNzPSJobS1zZW5kLXRleHQiPtix2YjYtCDYp9ix2LPYp9mEINix2Kcg2KfZhtiq2K7Yp9ioINqp2YbbjNivPC9kaXY+PGRpdiBjbGFzcz0iaG0tc2VuZC1hY3Rpb25zIj48YnV0dG9uIGRhdGEtc2VuZD0id2EiPtmI2KfYqtiz2KfZvjwvYnV0dG9uPjxidXR0b24gZGF0YS1zZW5kPSJzbXMiPtm+24zYp9mF2qk8L2J1dHRvbj48YnV0dG9uIGRhdGEtc2VuZD0ibWFpbCI+2KfbjNmF24zZhDwvYnV0dG9uPjxidXR0b24gZGF0YS1zZW5kPSJjbG9zZSI+2KjYs9iq2YY8L2J1dHRvbj48L2Rpdj4nOwogZG9jdW1lbnQuYm9keS5hcHBlbmRDaGlsZChwKTsKIGNvbnN0IGw9bGlua3MoKSxlPWVuY29kZVVSSUNvbXBvbmVudChtZXNzYWdlKTsKIHAuYWRkRXZlbnRMaXN0ZW5lcigiY2xpY2siLHg9PnsKICBjb25zdCBiPXgudGFyZ2V0LmNsb3Nlc3QoIltkYXRhLXNlbmRdIik7aWYoIWIpcmV0dXJuOwogIGNvbnN0IHQ9Yi5kYXRhc2V0LnNlbmQ7aWYodD09PSJjbG9zZSIpe3AucmVtb3ZlKCk7cmV0dXJufQogIGxldCB1PSIiOwogIGlmKHQ9PT0id2EiKXU9bC53YT9sLndhKyhsLndhLmluY2x1ZGVzKCI/Iik/IiYiOiI/IikrInRleHQ9IitlOiJodHRwczovL3dhLm1lLz90ZXh0PSIrZTsKICBpZih0PT09InNtcyIpdT0ic21zOj9ib2R5PSIrZTsKICBpZih0PT09Im1haWwiKXU9Im1haWx0bzoiKyhsLm1haWx8fCIiKSsiP3N1YmplY3Q9IitlbmNvZGVVUklDb21wb25lbnQoItiv2LHYrtmI2KfYs9iqINm+2LHZiNqY2YcgSE0gU3R1ZGlvIikrIiZib2R5PSIrZTsKICB3aW5kb3cubG9jYXRpb24uaHJlZj11OwogfSk7Cn0KZnVuY3Rpb24gb3JkZXJCdXR0b24oZSl7CiBjb25zdCB0PXR4dChlLmlubmVyVGV4dHx8ZS50ZXh0Q29udGVudCk7CiByZXR1cm4gL9in2LHYs9in2YQg2K/Ysdiu2YjYp9iz2Kog2b7YsdmI2pjZh3zYr9ix2K7ZiNin2LPYqiDZvtix2YjamNmHfG9yZGVyIHByb2plY3R8cHJvamVjdCByZXF1ZXN0fHNlbmQgcmVxdWVzdC9pLnRlc3QodCk7Cn0KZnVuY3Rpb24gb3JkZXJDbGljayhlKXsKIGNvbnN0IGI9ZS50YXJnZXQuY2xvc2VzdCgiYnV0dG9uLGEiKTtpZighYnx8IW9yZGVyQnV0dG9uKGIpKXJldHVybjsKIGNvbnN0IHJvb3Q9Yi5jbG9zZXN0KCJmb3JtIil8fGIucGFyZW50RWxlbWVudD8ucGFyZW50RWxlbWVudHx8ZG9jdW1lbnQuYm9keTsKIGNvbnN0IG09Y29sbGVjdChyb290KXx8Y29sbGVjdChkb2N1bWVudC5ib2R5KTsKIGlmKCFtKXJldHVybjsKIGUucHJldmVudERlZmF1bHQoKTtlLnN0b3BQcm9wYWdhdGlvbigpO3BhbmVsKCLYr9ix2K7ZiNin2LPYqiDZvtix2YjamNmHXG5cbiIrbSk7Cn0KZnVuY3Rpb24gbXVzaWMoKXsKIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoImJ1dHRvbixhLFtyb2xlPWJ1dHRvbl0iKS5mb3JFYWNoKGI9PnsKICBjb25zdCB0PXR4dChiLmlubmVyVGV4dHx8Yi50ZXh0Q29udGVudCk7CiAgaWYoIS/Yhti12Kgg2KfZvtmE24zaqduM2LTZhnxpbnN0YWxsIGFwcC9pLnRlc3QodCkpcmV0dXJuOwogIGIudGV4dENvbnRlbnQ9IuKZqiI7Yi5zZXRBdHRyaWJ1dGUoImFyaWEtbGFiZWwiLCLYotmH2YbaryIpO2IudGl0bGU9Itii2YfZhtqvIjtiLmNsYXNzTGlzdC5hZGQoImhtLW11c2ljLWJ1dHRvbiIpOwogIGIuYWRkRXZlbnRMaXN0ZW5lcigiY2xpY2siLGU9PnsKICAgZS5wcmV2ZW50RGVmYXVsdCgpO2Uuc3RvcFByb3BhZ2F0aW9uKCk7CiAgIGlmKCF3aW5kb3cuX19obUF1ZGlvKXt3aW5kb3cuX19obUF1ZGlvPW5ldyBBdWRpbygiYXNzZXRzL2F1ZGlvL2FtYmllbnQubXAzIik7d2luZG93Ll9faG1BdWRpby5sb29wPXRydWV9CiAgIGlmKHdpbmRvdy5fX2htQXVkaW8ucGF1c2VkKXt3aW5kb3cuX19obUF1ZGlvLnBsYXkoKS5jYXRjaCgoKT0+e30pO2IuY2xhc3NMaXN0LmFkZCgicGxheWluZyIpfQogICBlbHNle3dpbmRvdy5fX19obUF1ZGlvLnBhdXNlKCk7Yi5jbGFzc2xpc3QucmVtb3ZlKCJwbGF5aW5nIil9CiAgfSx0cnVlKTsKICB9KTsKfQpmdW5jdGlvbiBib3R0b20oKXsKIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoImJvZHkgKiIpLmZvckVhY2goZT0+ewogIGNvbnN0IHQ9dHh0KGUudGV4dENvbnRlbnQpOwogIGlmKHQ9PT0i2KfZhNin2YbYp9iqInx8dD09PSJGZWF0dXJlcyJ8fHQ9PT0i2KfZhNmF2YrYstin2KoiKXsKICAgIGlmKGUuY2hpbGRyZW4ubGVuZ3RoPT09MCllLnN0eWxlLnZpc2liaWxpdHk9InZpc2libGUiOwogICAgZS5jbGFzc0xpc3QuYWRkKCJobS1mZWF0dXJlcy12aXNpYmxlIik7CiAgIH0KIH0pOwp9CmZ1bmN0aW9uIGNsb2NrKCl7CiBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCJib2R5ICoiKS5mb3JFYWNoKGU9PnsKICBpZihlLmNoaWxkcmVuLmxlbmd0aD4wKXJldHVybjsKICBjb25zdCB0PXR4dChlLnRleHRDb250ZW50KTsKICBpZigvXGJcZHsxLDJ9OlxkezJ9XGIvLnRlc3QodCl8fC/Ys9in2LnYqnzYstmF2KfZhnx0aW1lfGNsb2NrfGRhdGUvaS50ZXN0KGUuY2xhc3NOYW1lKyIgIitlLmlkKSl7CiAgIGUuY2xhc3NMaXN0LmFkZCgiaG0tc3RhYmxlLWluZm8iKTsKICB9CiB9KTsKfQpmdW5jdGlvbiBzZXR1cCgpewogbXVzaWMoKTtib3R0b20oKTtjbG9jaygpOwogZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcigiY2xpY2siLG9yZGVyQ2xpY2ssdHJ1ZSk7CiBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCJmb3JtIikuZm9yRWFjaChmPT57CiAgZi5hZGRFdmVudExpc3RlbmVyKCJzdWJtaXQiLGU9PnsKICAgY29uc3QgdD10eHQoZi5pbm5lclRleHR8fCIiKTsKICAgaWYoL9mG2YjYuSDZvtix2YjamNmHfNio2YjYr9is2Yd82KrZiNi224zYrdin2Kog2b7YsdmI2pjZh3xwcm9qZWN0IHR5cGV8YnVkZ2V0fHByb2plY3QgZGVzY3JpcHRpb24vaS50ZXN0KHQpKXsKICAgIGUucHJldmVudERlZmF1bHQoKTtlLnN0b3BQcm9wYWdhdGlvbigpOwogICAgcGFuZWwoItiv2LHYrtmI2KfYs9iqINm+2LHZiNqY2YdcblxuIitjb2xsZWN0KGYpKTsKICAgfQogIH0sdHJ1ZSk7CiB9KTsKfQppZihkb2N1bWVudC5yZWFkeVN0YXRlPT09ImxvYWRpbmciKWRvY3VtZW50LmFkZEV2ZW50TGlzdGVuZXIoIkRPTUNvbnRlbnRMb2FkZWQiLHNldHVwKTtlbHNlIHNldHVwKCk7Cn0pKCk7' | base64 -d > "$PROJECT/app/src/main/assets/js/mobile-stability.js"
 
-  var MUSIC_FILE = "assets/audio/ambient.mp3";
-  var WHATSAPP = "+989399020094";
-  var EMAIL = "m74981819@gmail.com";
+          test -s "$PROJECT/app/src/main/assets/js/mobile-stability.js"
 
-  var musicAudio = null;
-  var musicButton = null;
-
-  function language() {
-    return document.documentElement.lang || "fa";
-  }
-
-  function findMusicButton() {
-    var selectors = [
-      "#installButton",
-      "#installApp",
-      "#install-app",
-      "[id*='install' i]",
-      "[class*='install' i]",
-      "[aria-label*='install' i]",
-      "[title*='install' i]"
-    ];
-
-    for (var s = 0; s < selectors.length; s++) {
-      try {
-        var found = document.querySelector(selectors[s]);
-
-        if (found) {
-          return found;
-        }
-      } catch (e) {}
-    }
-
-    var elements = document.querySelectorAll(
-      "button, a, [role='button'], .btn, .button"
-    );
-
-    for (var i = 0; i < elements.length; i++) {
-      var el = elements[i];
-
-      var text = (
-        (el.innerText || "") +
-        " " +
-        (el.textContent || "") +
-        " " +
-        (el.getAttribute("aria-label") || "") +
-        " " +
-        (el.getAttribute("title") || "")
-      ).toLowerCase();
-
-      if (
-        text.indexOf("نصب اپلیکیشن") !== -1 ||
-        text.indexOf("نصب برنامه") !== -1 ||
-        text.indexOf("نصب اپ") !== -1 ||
-        text.indexOf("install app") !== -1
-      ) {
-        return el;
-      }
-    }
-
-    return null;
-  }
-
-  function setupMusic() {
-    var button = findMusicButton();
-
-    if (!button) {
-      return;
-    }
-
-    if (button.dataset.hmMusicReady === "1") {
-      return;
-    }
-
-    button.dataset.hmMusicReady = "1";
-    musicButton = button;
-
-    musicAudio = new Audio(MUSIC_FILE);
-    musicAudio.loop = true;
-    musicAudio.preload = "auto";
-
-    button.innerHTML = "♫";
-    button.setAttribute("aria-label", "آهنگ");
-    button.setAttribute("title", "آهنگ");
-    button.removeAttribute("download");
-
-    button.addEventListener(
-      "click",
-      function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (!musicAudio) {
-          return;
-        }
-
-        if (musicAudio.paused) {
-          musicAudio
-            .play()
-            .then(function () {
-              button.classList.add("hm-music-playing");
-              button.innerHTML = "♫";
-            })
-            .catch(function () {});
-        } else {
-          musicAudio.pause();
-          button.classList.remove("hm-music-playing");
-          button.innerHTML = "♫";
-        }
-      },
-      true
-    );
-  }
-
-  function getForm() {
-    var form =
-      document.querySelector("#projectForm") ||
-      document.querySelector("form[action*='project' i]") ||
-      document.querySelector("form");
-
-    if (form) {
-      return form;
-    }
-
-    var submitButtons = document.querySelectorAll(
-      "button, input[type='submit'], [role='button']"
-    );
-
-    for (var i = 0; i < submitButtons.length; i++) {
-      var b = submitButtons[i];
-
-      var txt = (
-        (b.innerText || "") +
-        " " +
-        (b.value || "") +
-        " " +
-        (b.textContent || "")
-      );
-
-      if (
-        txt.indexOf("ارسال درخواست پروژه") !== -1 ||
-        txt.indexOf("درخواست پروژه") !== -1 ||
-        txt.indexOf("ارسال درخواست") !== -1 ||
-        txt.toLowerCase().indexOf("project request") !== -1
-      ) {
-        return (
-          b.closest("form") ||
-          b.parentElement.closest("form") ||
-          document.querySelector("form")
-        );
-      }
-    }
-
-    return null;
-  }
-
-  function readForm(form) {
-    var lines = [];
-
-    lines.push("HM Studio - Project Request");
-    lines.push("------------------------------");
-
-    if (form) {
-      var fields = form.querySelectorAll(
-        "input, select, textarea"
-      );
-
-      for (var i = 0; i < fields.length; i++) {
-        var field = fields[i];
-
-        if (
-          field.disabled ||
-          field.type === "hidden" ||
-          field.type === "submit" ||
-          field.type === "button"
-        ) {
-          continue;
-        }
-
-        var value = "";
-
-        if (field.type === "checkbox" || field.type === "radio") {
-          if (!field.checked) {
-            continue;
-          }
-
-          value = field.value || "yes";
-        } else {
-          value = field.value || "";
-        }
-
-        value = String(value).trim();
-
-        if (!value) {
-          continue;
-        }
-
-        var label = "";
-
-        if (field.labels && field.labels.length) {
-          label = field.labels[0].innerText || "";
-        }
-
-        if (!label) {
-          label =
-            field.getAttribute("aria-label") ||
-            field.getAttribute("name") ||
-            field.getAttribute("placeholder") ||
-            "Field";
-        }
-
-        lines.push(
-          String(label).trim() +
-          ": " +
-          value
-        );
-      }
-    }
-
-    if (lines.length === 2) {
-      var textareas = document.querySelectorAll(
-        "input, select, textarea"
-      );
-
-      for (var j = 0; j < textareas.length; j++) {
-        var f = textareas[j];
-
-        if (
-          f.value &&
-          f.type !== "hidden" &&
-          f.type !== "submit"
-        ) {
-          lines.push(
-            f.getAttribute("name") ||
-            f.getAttribute("placeholder") ||
-            "Field"
-          );
-
-          lines.push(
-            String(f.value).trim()
-          );
-        }
-      }
-    }
-
-    return lines.join("\n");
-  }
-
-  function createActionButton(
-    parent,
-    text,
-    callback
-  ) {
-    var button = document.createElement("button");
-
-    button.type = "button";
-    button.className = "hm-send";
-    button.textContent = text;
-
-    button.addEventListener(
-      "click",
-      function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        callback();
-      },
-      true
-    );
-
-    parent.appendChild(button);
-  }
-
-  function showSendActions(
-    button,
-    form
-  ) {
-    var old =
-      document.getElementById(
-        "hmOrderActions"
-      );
-
-    if (old) {
-      old.remove();
-    }
-
-    var actions =
-      document.createElement("div");
-
-    actions.id = "hmOrderActions";
-    actions.className =
-      "hm-order-actions";
-
-    var message =
-      readForm(form);
-
-    var subject =
-      "HM Studio Project Request";
-
-    createActionButton(
-      actions,
-      "واتساپ",
-      function () {
-        window.location.href =
-          "https://wa.me/" +
-          WHATSAPP +
-          "?text=" +
-          encodeURIComponent(message);
-      }
-    );
-
-    createActionButton(
-      actions,
-      "پیامک",
-      function () {
-        window.location.href =
-          "sms:" +
-          WHATSAPP +
-          "?body=" +
-          encodeURIComponent(message);
-      }
-    );
-
-    createActionButton(
-      actions,
-      "تلگرام",
-      function () {
-        window.location.href =
-          "https://t.me/share/url?url=&text=" +
-          encodeURIComponent(message);
-      }
-    );
-
-    createActionButton(
-      actions,
-      "ایمیل",
-      function () {
-        window.location.href =
-          "mailto:" +
-          EMAIL +
-          "?subject=" +
-          encodeURIComponent(subject) +
-          "&body=" +
-          encodeURIComponent(message);
-      }
-    );
-
-    var host =
-      button.parentElement ||
-      form ||
-      document.body;
-
-    host.appendChild(actions);
-
-    setTimeout(function () {
-      actions.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest"
-      });
-    }, 50);
-  }
-
-  function findProjectButtons() {
-    var result = [];
-
-    var elements = document.querySelectorAll(
-      "button, input[type='submit'], [role='button'], a"
-    );
-
-    for (var i = 0; i < elements.length; i++) {
-      var element = elements[i];
-
-      var text = (
-        (element.innerText || "") +
-        " " +
-        (element.textContent || "") +
-        " " +
-        (element.value || "") +
-        " " +
-        (element.getAttribute("aria-label") || "") +
-        " " +
-        (element.getAttribute("title") || "")
-      );
-
-      if (
-        text.indexOf("ارسال درخواست پروژه") !== -1 ||
-        text.indexOf("ارسال درخواست") !== -1 ||
-        text.indexOf("درخواست پروژه") !== -1 ||
-        text.toLowerCase().indexOf("project request") !== -1 ||
-        text.toLowerCase().indexOf("send project") !== -1
-      ) {
-        result.push(element);
-      }
-    }
-
-    return result;
-  }
-
-  function setupProjectSubmission() {
-    var buttons =
-      findProjectButtons();
-
-    for (var i = 0; i < buttons.length; i++) {
-      var button = buttons[i];
-
-      if (
-        button.dataset.hmProjectReady === "1"
-      ) {
-        continue;
-      }
-
-      button.dataset.hmProjectReady = "1";
-
-      button.addEventListener(
-        "click",
-        function (event) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-
-          var form =
-            this.closest("form") ||
-            getForm();
-
-          showSendActions(
-            this,
-            form
-          );
-        },
-        true
-      );
-    }
-  }
-
-  function setupBottomFeatures() {
-    var elements = document.querySelectorAll(
-      "a, button, li, div, span"
-    );
-
-    for (var i = 0; i < elements.length; i++) {
-      var element = elements[i];
-
-      var text =
-        (element.innerText || "").trim();
-
-      if (
-        text === "امکانات" ||
-        text === "الخدمات" ||
-        text.toLowerCase() === "features" ||
-        text.toLowerCase() === "services"
-      ) {
-        element.classList.add(
-          "hm-features-visible"
-        );
-
-        element.style.opacity = "1";
-        element.style.visibility = "visible";
-        element.style.pointerEvents = "auto";
-      }
-    }
-  }
-
-  function stabilizeClock() {
-    var now = new Date();
-
-    var locale =
-      language() === "fa"
-        ? "fa-IR-u-ca-persian"
-        : language() === "ar"
-          ? "ar-SA-u-ca-islamic"
-          : "en-US";
-
-    var time =
-      new Intl.DateTimeFormat(
-        locale,
-        {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: false
-        }
-      ).format(now);
-
-    var date =
-      new Intl.DateTimeFormat(
-        locale,
-        {
-          day: "numeric",
-          month: "long",
-          year: "numeric"
-        }
-      ).format(now);
-
-    var clock =
-      document.getElementById(
-        "hmStableClock"
-      );
-
-    if (!clock) {
-      clock =
-        document.createElement("div");
-
-      clock.id =
-        "hmStableClock";
-
-      clock.className =
-        "hm-stable-clock";
-
-      var parent =
-        document.querySelector(".hero") ||
-        document.querySelector(".hud-depth") ||
-        document.body;
-
-      parent.appendChild(clock);
-    }
-
-    clock.textContent =
-      time + "  ·  " + date;
-  }
-
-  function hideProblemLayers() {
-    var selectors = [
-      ".hud-depth",
-      ".scene .depth-layer",
-      ".scene .holo-layer"
-    ];
-
-    for (var i = 0; i < selectors.length; i++) {
-      try {
-        document
-          .querySelectorAll(selectors[i])
-          .forEach(function (element) {
-            element.classList.add(
-              "hm-static-hidden"
-            );
-          });
-      } catch (e) {}
-    }
-  }
-
-  function boot() {
-    setupMusic();
-    setupProjectSubmission();
-    setupBottomFeatures();
-    hideProblemLayers();
-    stabilizeClock();
-
-    setInterval(
-      stabilizeClock,
-      1000
-    );
-
-    setTimeout(
-      setupMusic,
-      300
-    );
-
-    setTimeout(
-      setupProjectSubmission,
-      300
-    );
-
-    setTimeout(
-      setupBottomFeatures,
-      300
-    );
-
-    setTimeout(
-      setupMusic,
-      1000
-    );
-
-    setTimeout(
-      setupProjectSubmission,
-      1000
-    );
-
-    setTimeout(
-      setupBottomFeatures,
-      1000
-    );
-
-    setTimeout(
-      setupMusic,
-      2500
-    );
-
-    setTimeout(
-      setupProjectSubmission,
-      2500
-    );
-
-    setTimeout(
-      setupBottomFeatures,
-      2500
-    );
-  }
-
-  if (
-    document.readyState ===
-    "loading"
-  ) {
-    document.addEventListener(
-      "DOMContentLoaded",
-      boot,
-      { once: true }
-    );
-  } else {
-    boot();
-  }
-
-})();
-JAVASCRIPT
-
-          test -s "$PROJECT/app/src/main/assets/js/hm-v6-final.js"
-
-          node --check \
-            "$PROJECT/app/src/main/assets/js/hm-v6-final.js"
-
-          echo "FINAL JAVASCRIPT OK"
-
-      - name: Create final mobile CSS
+      - name: Create Mobile CSS
         shell: bash
         run: |
           set -e
 
-          mkdir -p "$PROJECT/app/src/main/assets/css"
+          echo 'I2htLXNlbmQtcGFuZWx7cG9zaXRpb246Zml4ZWQ7ei1pbmRleDoyMTQ3NDgzNjQ3O2xlZnQ6MTZweDtyaWdodDoxNnB4O2JvdHRvbTo4OHB4O3BhZGRpbmc6MThweDtib3JkZXI6MXB4IHNvbGlkIHJnYmEoODAsMTkwLDI1NSwuMzUpO2JvcmRlci1yYWRpdXM6MjJweDtiYWNrZ3JvdW5kOnJnYmEoMywxOCwzMSwuOTgpO2JveC1zaGFkb3c6MCAxOHB4IDUwcHggcmdiYSgwLDAsMCwuNDUpO2ZvbnQtZmFtaWx5OmluaGVyaXQ7Y29sb3I6I2ZmZjt0ZXh0LWFsaWduOmNlbnRlcn0jaG0tc2VuZC1wYW5lbCAuaG0tc2VuZC10aXRsZXtmb250LXNpemU6MjBweDtmb250LXdlaWdodDo4MDA7bWFyZ2luLWJvdHRvbTo3cHh9I2htLXNlbmQtcGFuZWwgLmhtLXNlbmQtdGV4dHtvcGFjaXR5Oi44O21hcmdpbi1ib3R0b206MTRweH0uaG0tc2VuZC1hY3Rpb25ze2Rpc3BsYXk6Z3JpZDtncmlkLXRlbXBsYXRlLWNvbHVtbnM6MWZyIDFmcjtnYXA6MTBweH0uaG0tc2VuZC1hY3Rpb25zIGJ1dHRvbnttaW4taGVpZ2h0OjUycHg7Ym9yZGVyOjFweCBzb2xpZCByZ2JhKDgwLDE5MCwyNTUsLjQpO2JvcmRlci1yYWRpdXM6MTVweDtiYWNrZ3JvdW5kOiMwNzFjMmQ7Y29sb3I6I2ZmZjtmb250OmluaGVyaXQ7Zm9udC13ZWlnaHQ6NzAwfS5obS1zZW5kLWFjdGlvbnMgYnV0dG9uOmFjdGl2ZXt0cmFuc2Zvcm06c2NhbGUoLjk3KTtib3gtc2hhZG93OjAgMCAxOHB4IHJnYmEoMjU1LDQwLDQwLC4zNSl9LmhtLW11c2ljLWJ1dHRvbi5wbGF5aW5ne2JveC1zaGFkb3c6MCAwIDAgMnB4IHJnYmEoNjAsMTkwLDI1NSwuMzUpLDAgMCAyNHB4IHJnYmEoNjAsMTkwLDI1NSwuMzUpIWltcG9ydGFudH0uaG0tc3RhYmxlLWluZm97YW5pbWF0aW9uOm5vbmUhaW1wb3J0YW50O3RyYW5zaXRpb246bm9uZSFpbXBvcnRhbnQ7b3BhY2l0eToxIWltcG9ydGFudDt2aXNpYmlsaXR5OnZpc2libGUhaW1wb3J0YW50O3RyYW5zZm9ybTpub25lIWltcG9ydGFudH0uaG0tZmVhdHVyZXMtdmlzaWJsZXt2aXNpYmlsaXR5OnZpc2libGUhaW1wb3J0YW50O29wYWNpdHk6MSFpbXBvcnRhbnQ7ZGlzcGxheTpibG9jayFpbXBvcnRhbnR9' | base64 -d > "$PROJECT/app/src/main/assets/css/mobile-stability.css"
 
-          cat > "$PROJECT/app/src/main/assets/css/hm-v6-final.css" <<'CSS'
-.hm-stable-clock {
-  display: block !important;
-  position: relative !important;
-  z-index: 50 !important;
-  width: min(90%, 420px) !important;
-  box-sizing: border-box !important;
-  margin: 10px auto !important;
-  padding: 10px 12px !important;
-  border-radius: 14px !important;
-  background: rgba(8, 12, 18, 0.94) !important;
-  color: #ffffff !important;
-  text-align: center !important;
-  font: 600 15px/1.5 system-ui, sans-serif !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  animation: none !important;
-  transition: none !important;
-  overflow: visible !important;
-}
+          test -s "$PROJECT/app/src/main/assets/css/mobile-stability.css"
 
-.hm-static-hidden {
-  animation: none !important;
-  transition: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
-
-.hm-order-actions {
-  position: relative !important;
-  z-index: 99999 !important;
-  display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
-  gap: 10px !important;
-  width: 100% !important;
-  margin: 14px 0 0 !important;
-  padding: 8px !important;
-  box-sizing: border-box !important;
-  clear: both !important;
-}
-
-.hm-send {
-  position: relative !important;
-  z-index: 100000 !important;
-  min-height: 48px !important;
-  width: 100% !important;
-  border: 1px solid rgba(70, 190, 255, 0.35) !important;
-  border-radius: 14px !important;
-  background: rgba(10, 30, 48, 0.96) !important;
-  color: #ffffff !important;
-  font: 700 15px/1.3 system-ui, sans-serif !important;
-  padding: 10px 12px !important;
-  cursor: pointer !important;
-  touch-action: manipulation !important;
-}
-
-.hm-send:active {
-  transform: scale(0.98) !important;
-  box-shadow:
-    0 0 0 2px rgba(220, 40, 40, 0.20),
-    0 0 18px rgba(220, 40, 40, 0.28) !important;
-}
-
-.hm-music-playing {
-  box-shadow:
-    0 0 0 2px rgba(80, 190, 255, 0.25),
-    0 0 22px rgba(80, 190, 255, 0.40) !important;
-}
-
-.hm-features-visible {
-  position: relative !important;
-  z-index: 10001 !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  pointer-events: auto !important;
-}
-
-nav,
-.bottom-nav,
-.bottom-navigation,
-.mobile-nav,
-.fixed-bottom {
-  z-index: 9000 !important;
-}
-
-nav a,
-nav button,
-.bottom-nav a,
-.bottom-nav button,
-.bottom-navigation a,
-.bottom-navigation button,
-.mobile-nav a,
-.mobile-nav button {
-  opacity: 1 !important;
-  visibility: visible !important;
-  pointer-events: auto !important;
-}
-
-@media (max-width: 600px) {
-  .hm-stable-clock {
-    width: 90% !important;
-    font-size: 14px !important;
-  }
-
-  .hm-order-actions {
-    grid-template-columns: 1fr 1fr !important;
-  }
-
-  .hm-send {
-    min-height: 48px !important;
-  }
-}
-CSS
-
-          test -s \
-            "$PROJECT/app/src/main/assets/css/hm-v6-final.css"
-
-          echo "FINAL CSS OK"
-
-      - name: Attach final files to V6
+      - name: Attach Stability Files
         shell: bash
         run: |
           set -e
 
           INDEX="$PROJECT/app/src/main/assets/index.html"
 
-          test -f "$INDEX"
+          python3 -c "from pathlib import Path; p=Path('$INDEX'); s=p.read_text(encoding='utf-8'); a='<link rel=\"stylesheet\" href=\"css/mobile-stability.css\">'; b='<script src=\"js/mobile-stability.js\" defer></script>'; s=s if 'mobile-stability.css' in s else s.replace('</head>',a+'\\n</head>'); s=s if 'mobile-stability.js' in s else s.replace('</body>',b+'\\n</body>'); p.write_text(s,encoding='utf-8')"
 
-          python3 - "$INDEX" <<'PY'
-          import sys
-          from pathlib import Path
+          grep -q "mobile-stability.css" "$INDEX"
+          grep -q "mobile-stability.js" "$INDEX"
 
-          path = Path(sys.argv[1])
-
-          html = path.read_text(
-              encoding="utf-8"
-          )
-
-          css_tag = (
-              '<link rel="stylesheet" '
-              'href="css/hm-v6-final.css">'
-          )
-
-          js_tag = (
-              '<script '
-              'src="js/hm-v6-final.js">'
-              '</script>'
-          )
-
-          if "hm-v6-final.css" not in html:
-              if "</head>" in html:
-                  html = html.replace(
-                      "</head>",
-                      css_tag + "\n</head>",
-                      1
-                  )
-              else:
-                  html = (
-                      css_tag +
-                      "\n" +
-                      html
-                  )
-
-          if "hm-v6-final.js" not in html:
-              if "</body>" in html:
-                  html = html.replace(
-                      "</body>",
-                      js_tag + "\n</body>",
-                      1
-                  )
-              else:
-                  html = (
-                      html +
-                      "\n" +
-                      js_tag
-                  )
-
-          path.write_text(
-              html,
-              encoding="utf-8"
-          )
-
-          print(
-              "Final JS/CSS attached successfully"
-          )
-          PY
-
-          grep -q \
-            "hm-v6-final.css" \
-            "$INDEX"
-
-          grep -q \
-            "hm-v6-final.js" \
-            "$INDEX"
-
-          echo "FINAL PATCH ATTACHED"
-
-      - name: Verify audio
-        shell: bash
-        run: |
-          set -e
-
-          AUDIO="$PROJECT/app/src/main/assets/audio/ambient.mp3"
-
-          if [ ! -f "$AUDIO" ]; then
-            echo "WARNING: ambient.mp3 NOT FOUND"
-            echo "Music button will still exist but audio file is unavailable."
-          else
-            echo "AUDIO FOUND:"
-            ls -lh "$AUDIO"
-          fi
+          echo "STABILITY FILES ATTACHED"
 
       - name: Build APK
         shell: bash
@@ -946,66 +124,35 @@ CSS
 
           cd "$PROJECT"
 
-          echo "========================================"
-          echo "BUILDING HM STUDIO V6 FINAL"
-          echo "========================================"
-
           gradle :app:assembleDebug \
             --no-daemon \
             --stacktrace \
-            --warning-mode all \
             --console=plain
-
-          echo "========================================"
-          echo "BUILD FINISHED"
-          echo "========================================"
 
       - name: Verify APK
         shell: bash
         run: |
           set -e
 
-          APK="$(
-            find "$PROJECT/app/build/outputs/apk" \
-              -type f \
-              -name '*.apk' \
-              -print \
-              | head -n 1
-          )"
+          APK="$(find "$PROJECT/app/build/outputs/apk" -type f -name '*.apk' -print -quit)"
 
           if [ -z "$APK" ]; then
-            echo "========================================"
-            echo "ERROR: APK WAS NOT GENERATED"
-            echo "========================================"
-
-            find "$PROJECT/app/build" \
-              -type f \
-              -print \
-              | sort || true
-
+            echo "ERROR: APK NOT GENERATED"
+            find "$PROJECT/app/build" -maxdepth 8 -type f -print 2>/dev/null || true
             exit 1
           fi
 
-          echo "========================================"
-          echo "APK FOUND"
+          echo "APK FOUND:"
           echo "$APK"
-          echo "========================================"
 
-          mkdir -p apk-output
+          mkdir -p release
+          cp "$APK" release/HM-Studio-V6-Final.apk
 
-          cp "$APK" \
-            apk-output/hm-studio-v6-final-debug.apk
-
-          test -s \
-            apk-output/hm-studio-v6-final-debug.apk
-
-          ls -lh \
-            apk-output/hm-studio-v6-final-debug.apk
+          ls -lh release/HM-Studio-V6-Final.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: hm-studio-v6-final-debug
-          path: apk-output/hm-studio-v6-final-debug.apk
+          name: HM-Studio-V6-Final-APK
+          path: release/HM-Studio-V6-Final.apk
           if-no-files-found: error
-          retention-days: 14
