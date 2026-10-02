@@ -1,4 +1,4 @@
-name: HM Studio V6 Stable APK
+name: HM Studio V6 Final APK
 
 on:
   workflow_dispatch:
@@ -32,9 +32,12 @@ jobs:
           ZIP="$(find . -type f -name 'hm-studio-app-v6-corrected.zip' -print -quit)"
 
           if [ -z "$ZIP" ]; then
-            echo "ERROR: V6 ZIP NOT FOUND"
+            echo "ERROR: hm-studio-app-v6-corrected.zip NOT FOUND"
             exit 1
           fi
+
+          echo "V6 ZIP FOUND:"
+          echo "$ZIP"
 
           rm -rf v6-project
           mkdir -p v6-project
@@ -45,6 +48,7 @@ jobs:
 
           if [ -z "$PROJECT" ]; then
             echo "ERROR: settings.gradle NOT FOUND"
+            find v6-project -maxdepth 6 -type f | sort | head -200
             exit 1
           fi
 
@@ -53,12 +57,17 @@ jobs:
             exit 1
           fi
 
+          if [ ! -f "$PROJECT/app/src/main/AndroidManifest.xml" ]; then
+            echo "ERROR: AndroidManifest.xml NOT FOUND"
+            exit 1
+          fi
+
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
 
-          echo "================================"
-          echo "V6 PROJECT FOUND"
+          echo "========================================"
+          echo "V6 PROJECT"
           echo "$PROJECT"
-          echo "================================"
+          echo "========================================"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -72,321 +81,772 @@ jobs:
 
           cd "$PROJECT"
 
+          echo "Gradle version:"
+          gradle --version
+
           test -f settings.gradle
           test -f app/build.gradle
           test -f app/src/main/AndroidManifest.xml
 
-          gradle --version
+          echo "ANDROID PROJECT CHECK PASSED"
 
-          echo "PROJECT CHECK OK"
-
-      - name: Create stability JavaScript
+      - name: Create final mobile JavaScript
         shell: bash
         run: |
           set -e
 
           mkdir -p "$PROJECT/app/src/main/assets/js"
 
-          python3 - "$PROJECT/app/src/main/assets/js/hm-v6-stability.js" <<'PY'
-          import sys
-          from pathlib import Path
+          cat > "$PROJECT/app/src/main/assets/js/hm-v6-final.js" <<'JAVASCRIPT'
+(function () {
+  "use strict";
 
-          output = Path(sys.argv[1])
+  var MUSIC_FILE = "assets/audio/ambient.mp3";
+  var WHATSAPP = "+989399020094";
+  var EMAIL = "m74981819@gmail.com";
 
-          code = r'''
-          (function () {
-            "use strict";
+  var musicAudio = null;
+  var musicButton = null;
 
-            function getLanguage() {
-              return document.documentElement.lang || "fa";
-            }
+  function language() {
+    return document.documentElement.lang || "fa";
+  }
 
-            function updateClock() {
-              var now = new Date();
-              var language = getLanguage();
+  function findMusicButton() {
+    var selectors = [
+      "#installButton",
+      "#installApp",
+      "#install-app",
+      "[id*='install' i]",
+      "[class*='install' i]",
+      "[aria-label*='install' i]",
+      "[title*='install' i]"
+    ];
 
-              var locale =
-                language === "fa"
-                  ? "fa-IR-u-ca-persian"
-                  : language === "ar"
-                    ? "ar-SA-u-ca-islamic"
-                    : "en-US";
+    for (var s = 0; s < selectors.length; s++) {
+      try {
+        var found = document.querySelector(selectors[s]);
 
-              var time = new Intl.DateTimeFormat(locale, {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-                hour12: false
-              }).format(now);
+        if (found) {
+          return found;
+        }
+      } catch (e) {}
+    }
 
-              var date = new Intl.DateTimeFormat(locale, {
-                day: "numeric",
-                month: "long",
-                year: "numeric"
-              }).format(now);
+    var elements = document.querySelectorAll(
+      "button, a, [role='button'], .btn, .button"
+    );
 
-              var clock = document.getElementById("hmStableClock");
+    for (var i = 0; i < elements.length; i++) {
+      var el = elements[i];
 
-              if (!clock) {
-                clock = document.createElement("div");
-                clock.id = "hmStableClock";
-                clock.className = "hm-stable-clock";
+      var text = (
+        (el.innerText || "") +
+        " " +
+        (el.textContent || "") +
+        " " +
+        (el.getAttribute("aria-label") || "") +
+        " " +
+        (el.getAttribute("title") || "")
+      ).toLowerCase();
 
-                var parent =
-                  document.querySelector(".hero") ||
-                  document.querySelector(".hud-depth") ||
-                  document.body;
+      if (
+        text.indexOf("نصب اپلیکیشن") !== -1 ||
+        text.indexOf("نصب برنامه") !== -1 ||
+        text.indexOf("نصب اپ") !== -1 ||
+        text.indexOf("install app") !== -1
+      ) {
+        return el;
+      }
+    }
 
-                parent.appendChild(clock);
-              }
+    return null;
+  }
 
-              clock.textContent = time + "  ·  " + date;
-            }
+  function setupMusic() {
+    var button = findMusicButton();
 
-            function stabilizeVisualLayers() {
-              var selectors = [
-                ".hud-depth",
-                ".scene .screen",
-                ".scene .glass-console",
-                ".scene .depth-layer",
-                ".scene .holo-layer"
-              ];
+    if (!button) {
+      return;
+    }
 
-              document.querySelectorAll(selectors.join(",")).forEach(function (element) {
-                element.classList.add("hm-static-hidden");
-              });
-            }
+    if (button.dataset.hmMusicReady === "1") {
+      return;
+    }
 
-            function addSendButton(container, label, callback) {
-              var button = document.createElement("button");
+    button.dataset.hmMusicReady = "1";
+    musicButton = button;
 
-              button.type = "button";
-              button.className = "hm-send";
-              button.textContent = label;
+    musicAudio = new Audio(MUSIC_FILE);
+    musicAudio.loop = true;
+    musicAudio.preload = "auto";
 
-              button.addEventListener("click", callback);
+    button.innerHTML = "♫";
+    button.setAttribute("aria-label", "آهنگ");
+    button.setAttribute("title", "آهنگ");
+    button.removeAttribute("download");
 
-              container.appendChild(button);
-            }
+    button.addEventListener(
+      "click",
+      function (event) {
+        event.preventDefault();
+        event.stopPropagation();
 
-            function installOrderForm() {
-              var form = document.getElementById("projectForm");
+        if (!musicAudio) {
+          return;
+        }
 
-              if (!form || form.dataset.hmInstalled === "1") {
-                return;
-              }
+        if (musicAudio.paused) {
+          musicAudio
+            .play()
+            .then(function () {
+              button.classList.add("hm-music-playing");
+              button.innerHTML = "♫";
+            })
+            .catch(function () {});
+        } else {
+          musicAudio.pause();
+          button.classList.remove("hm-music-playing");
+          button.innerHTML = "♫";
+        }
+      },
+      true
+    );
+  }
 
-              form.dataset.hmInstalled = "1";
+  function getForm() {
+    var form =
+      document.querySelector("#projectForm") ||
+      document.querySelector("form[action*='project' i]") ||
+      document.querySelector("form");
 
-              form.addEventListener("submit", function (event) {
-                event.preventDefault();
+    if (form) {
+      return form;
+    }
 
-                var data = Object.fromEntries(
-                  new FormData(form).entries()
-                );
+    var submitButtons = document.querySelectorAll(
+      "button, input[type='submit'], [role='button']"
+    );
 
-                var message = [
-                  "HM Studio - Project Request",
-                  "------------------------------",
-                  "First name: " + (data.firstName || data.firstname || ""),
-                  "Last name: " + (data.lastName || data.lastname || ""),
-                  "Email: " + (data.email || ""),
-                  "Phone: " + (data.phone || ""),
-                  "Project: " + (data.projectType || data.project || ""),
-                  "Budget: " + (data.budget || ""),
-                  "Location: " + (data.location || ""),
-                  "Description: " + (data.description || "")
-                ].join("\n");
+    for (var i = 0; i < submitButtons.length; i++) {
+      var b = submitButtons[i];
 
-                var actions = document.getElementById("hmOrderActions");
+      var txt = (
+        (b.innerText || "") +
+        " " +
+        (b.value || "") +
+        " " +
+        (b.textContent || "")
+      );
 
-                if (!actions) {
-                  actions = document.createElement("div");
-                  actions.id = "hmOrderActions";
-                  actions.className = "hm-order-actions";
-                  form.appendChild(actions);
-                }
+      if (
+        txt.indexOf("ارسال درخواست پروژه") !== -1 ||
+        txt.indexOf("درخواست پروژه") !== -1 ||
+        txt.indexOf("ارسال درخواست") !== -1 ||
+        txt.toLowerCase().indexOf("project request") !== -1
+      ) {
+        return (
+          b.closest("form") ||
+          b.parentElement.closest("form") ||
+          document.querySelector("form")
+        );
+      }
+    }
 
-                actions.innerHTML = "";
+    return null;
+  }
 
-                var language = getLanguage();
+  function readForm(form) {
+    var lines = [];
 
-                var labels =
-                  language === "fa"
-                    ? ["واتساپ", "پیامک", "تلگرام", "ایمیل"]
-                    : language === "ar"
-                      ? ["واتساب", "SMS", "تلغرام", "البريد"]
-                      : ["WhatsApp", "SMS", "Telegram", "Email"];
+    lines.push("HM Studio - Project Request");
+    lines.push("------------------------------");
 
-                var phone = "+989399020094";
-                var email = "m74981819@gmail.com";
+    if (form) {
+      var fields = form.querySelectorAll(
+        "input, select, textarea"
+      );
 
-                addSendButton(actions, labels[0], function () {
-                  window.location.href =
-                    "https://wa.me/" +
-                    phone +
-                    "?text=" +
-                    encodeURIComponent(message);
-                });
+      for (var i = 0; i < fields.length; i++) {
+        var field = fields[i];
 
-                addSendButton(actions, labels[1], function () {
-                  window.location.href =
-                    "sms:" +
-                    phone +
-                    "?body=" +
-                    encodeURIComponent(message);
-                });
+        if (
+          field.disabled ||
+          field.type === "hidden" ||
+          field.type === "submit" ||
+          field.type === "button"
+        ) {
+          continue;
+        }
 
-                addSendButton(actions, labels[2], function () {
-                  window.location.href =
-                    "https://t.me/share/url?url=&text=" +
-                    encodeURIComponent(message);
-                });
+        var value = "";
 
-                addSendButton(actions, labels[3], function () {
-                  window.location.href =
-                    "mailto:" +
-                    email +
-                    "?subject=" +
-                    encodeURIComponent("HM Studio Project Request") +
-                    "&body=" +
-                    encodeURIComponent(message);
-                });
+        if (field.type === "checkbox" || field.type === "radio") {
+          if (!field.checked) {
+            continue;
+          }
 
-                actions.scrollIntoView({
-                  behavior: "smooth",
-                  block: "nearest"
-                });
-              });
-            }
+          value = field.value || "yes";
+        } else {
+          value = field.value || "";
+        }
 
-            function boot() {
-              stabilizeVisualLayers();
-              installOrderForm();
-              updateClock();
+        value = String(value).trim();
 
-              setInterval(updateClock, 1000);
-            }
+        if (!value) {
+          continue;
+        }
 
-            if (document.readyState === "loading") {
-              document.addEventListener(
-                "DOMContentLoaded",
-                boot,
-                { once: true }
-              );
-            } else {
-              boot();
-            }
-          })();
-          '''
+        var label = "";
 
-          output.write_text(code.strip() + "\n", encoding="utf-8")
-          print("JavaScript created:", output)
-          PY
+        if (field.labels && field.labels.length) {
+          label = field.labels[0].innerText || "";
+        }
 
-          test -s "$PROJECT/app/src/main/assets/js/hm-v6-stability.js"
+        if (!label) {
+          label =
+            field.getAttribute("aria-label") ||
+            field.getAttribute("name") ||
+            field.getAttribute("placeholder") ||
+            "Field";
+        }
 
-          node --check "$PROJECT/app/src/main/assets/js/hm-v6-stability.js"
+        lines.push(
+          String(label).trim() +
+          ": " +
+          value
+        );
+      }
+    }
 
-          echo "JAVASCRIPT OK"
+    if (lines.length === 2) {
+      var textareas = document.querySelectorAll(
+        "input, select, textarea"
+      );
 
-      - name: Create stability CSS
+      for (var j = 0; j < textareas.length; j++) {
+        var f = textareas[j];
+
+        if (
+          f.value &&
+          f.type !== "hidden" &&
+          f.type !== "submit"
+        ) {
+          lines.push(
+            f.getAttribute("name") ||
+            f.getAttribute("placeholder") ||
+            "Field"
+          );
+
+          lines.push(
+            String(f.value).trim()
+          );
+        }
+      }
+    }
+
+    return lines.join("\n");
+  }
+
+  function createActionButton(
+    parent,
+    text,
+    callback
+  ) {
+    var button = document.createElement("button");
+
+    button.type = "button";
+    button.className = "hm-send";
+    button.textContent = text;
+
+    button.addEventListener(
+      "click",
+      function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        callback();
+      },
+      true
+    );
+
+    parent.appendChild(button);
+  }
+
+  function showSendActions(
+    button,
+    form
+  ) {
+    var old =
+      document.getElementById(
+        "hmOrderActions"
+      );
+
+    if (old) {
+      old.remove();
+    }
+
+    var actions =
+      document.createElement("div");
+
+    actions.id = "hmOrderActions";
+    actions.className =
+      "hm-order-actions";
+
+    var message =
+      readForm(form);
+
+    var subject =
+      "HM Studio Project Request";
+
+    createActionButton(
+      actions,
+      "واتساپ",
+      function () {
+        window.location.href =
+          "https://wa.me/" +
+          WHATSAPP +
+          "?text=" +
+          encodeURIComponent(message);
+      }
+    );
+
+    createActionButton(
+      actions,
+      "پیامک",
+      function () {
+        window.location.href =
+          "sms:" +
+          WHATSAPP +
+          "?body=" +
+          encodeURIComponent(message);
+      }
+    );
+
+    createActionButton(
+      actions,
+      "تلگرام",
+      function () {
+        window.location.href =
+          "https://t.me/share/url?url=&text=" +
+          encodeURIComponent(message);
+      }
+    );
+
+    createActionButton(
+      actions,
+      "ایمیل",
+      function () {
+        window.location.href =
+          "mailto:" +
+          EMAIL +
+          "?subject=" +
+          encodeURIComponent(subject) +
+          "&body=" +
+          encodeURIComponent(message);
+      }
+    );
+
+    var host =
+      button.parentElement ||
+      form ||
+      document.body;
+
+    host.appendChild(actions);
+
+    setTimeout(function () {
+      actions.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest"
+      });
+    }, 50);
+  }
+
+  function findProjectButtons() {
+    var result = [];
+
+    var elements = document.querySelectorAll(
+      "button, input[type='submit'], [role='button'], a"
+    );
+
+    for (var i = 0; i < elements.length; i++) {
+      var element = elements[i];
+
+      var text = (
+        (element.innerText || "") +
+        " " +
+        (element.textContent || "") +
+        " " +
+        (element.value || "") +
+        " " +
+        (element.getAttribute("aria-label") || "") +
+        " " +
+        (element.getAttribute("title") || "")
+      );
+
+      if (
+        text.indexOf("ارسال درخواست پروژه") !== -1 ||
+        text.indexOf("ارسال درخواست") !== -1 ||
+        text.indexOf("درخواست پروژه") !== -1 ||
+        text.toLowerCase().indexOf("project request") !== -1 ||
+        text.toLowerCase().indexOf("send project") !== -1
+      ) {
+        result.push(element);
+      }
+    }
+
+    return result;
+  }
+
+  function setupProjectSubmission() {
+    var buttons =
+      findProjectButtons();
+
+    for (var i = 0; i < buttons.length; i++) {
+      var button = buttons[i];
+
+      if (
+        button.dataset.hmProjectReady === "1"
+      ) {
+        continue;
+      }
+
+      button.dataset.hmProjectReady = "1";
+
+      button.addEventListener(
+        "click",
+        function (event) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+
+          var form =
+            this.closest("form") ||
+            getForm();
+
+          showSendActions(
+            this,
+            form
+          );
+        },
+        true
+      );
+    }
+  }
+
+  function setupBottomFeatures() {
+    var elements = document.querySelectorAll(
+      "a, button, li, div, span"
+    );
+
+    for (var i = 0; i < elements.length; i++) {
+      var element = elements[i];
+
+      var text =
+        (element.innerText || "").trim();
+
+      if (
+        text === "امکانات" ||
+        text === "الخدمات" ||
+        text.toLowerCase() === "features" ||
+        text.toLowerCase() === "services"
+      ) {
+        element.classList.add(
+          "hm-features-visible"
+        );
+
+        element.style.opacity = "1";
+        element.style.visibility = "visible";
+        element.style.pointerEvents = "auto";
+      }
+    }
+  }
+
+  function stabilizeClock() {
+    var now = new Date();
+
+    var locale =
+      language() === "fa"
+        ? "fa-IR-u-ca-persian"
+        : language() === "ar"
+          ? "ar-SA-u-ca-islamic"
+          : "en-US";
+
+    var time =
+      new Intl.DateTimeFormat(
+        locale,
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false
+        }
+      ).format(now);
+
+    var date =
+      new Intl.DateTimeFormat(
+        locale,
+        {
+          day: "numeric",
+          month: "long",
+          year: "numeric"
+        }
+      ).format(now);
+
+    var clock =
+      document.getElementById(
+        "hmStableClock"
+      );
+
+    if (!clock) {
+      clock =
+        document.createElement("div");
+
+      clock.id =
+        "hmStableClock";
+
+      clock.className =
+        "hm-stable-clock";
+
+      var parent =
+        document.querySelector(".hero") ||
+        document.querySelector(".hud-depth") ||
+        document.body;
+
+      parent.appendChild(clock);
+    }
+
+    clock.textContent =
+      time + "  ·  " + date;
+  }
+
+  function hideProblemLayers() {
+    var selectors = [
+      ".hud-depth",
+      ".scene .depth-layer",
+      ".scene .holo-layer"
+    ];
+
+    for (var i = 0; i < selectors.length; i++) {
+      try {
+        document
+          .querySelectorAll(selectors[i])
+          .forEach(function (element) {
+            element.classList.add(
+              "hm-static-hidden"
+            );
+          });
+      } catch (e) {}
+    }
+  }
+
+  function boot() {
+    setupMusic();
+    setupProjectSubmission();
+    setupBottomFeatures();
+    hideProblemLayers();
+    stabilizeClock();
+
+    setInterval(
+      stabilizeClock,
+      1000
+    );
+
+    setTimeout(
+      setupMusic,
+      300
+    );
+
+    setTimeout(
+      setupProjectSubmission,
+      300
+    );
+
+    setTimeout(
+      setupBottomFeatures,
+      300
+    );
+
+    setTimeout(
+      setupMusic,
+      1000
+    );
+
+    setTimeout(
+      setupProjectSubmission,
+      1000
+    );
+
+    setTimeout(
+      setupBottomFeatures,
+      1000
+    );
+
+    setTimeout(
+      setupMusic,
+      2500
+    );
+
+    setTimeout(
+      setupProjectSubmission,
+      2500
+    );
+
+    setTimeout(
+      setupBottomFeatures,
+      2500
+    );
+  }
+
+  if (
+    document.readyState ===
+    "loading"
+  ) {
+    document.addEventListener(
+      "DOMContentLoaded",
+      boot,
+      { once: true }
+    );
+  } else {
+    boot();
+  }
+
+})();
+JAVASCRIPT
+
+          test -s "$PROJECT/app/src/main/assets/js/hm-v6-final.js"
+
+          node --check \
+            "$PROJECT/app/src/main/assets/js/hm-v6-final.js"
+
+          echo "FINAL JAVASCRIPT OK"
+
+      - name: Create final mobile CSS
         shell: bash
         run: |
           set -e
 
           mkdir -p "$PROJECT/app/src/main/assets/css"
 
-          python3 - "$PROJECT/app/src/main/assets/css/hm-v6-stability.css" <<'PY'
-          import sys
-          from pathlib import Path
+          cat > "$PROJECT/app/src/main/assets/css/hm-v6-final.css" <<'CSS'
+.hm-stable-clock {
+  display: block !important;
+  position: relative !important;
+  z-index: 50 !important;
+  width: min(90%, 420px) !important;
+  box-sizing: border-box !important;
+  margin: 10px auto !important;
+  padding: 10px 12px !important;
+  border-radius: 14px !important;
+  background: rgba(8, 12, 18, 0.94) !important;
+  color: #ffffff !important;
+  text-align: center !important;
+  font: 600 15px/1.5 system-ui, sans-serif !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  animation: none !important;
+  transition: none !important;
+  overflow: visible !important;
+}
 
-          output = Path(sys.argv[1])
+.hm-static-hidden {
+  animation: none !important;
+  transition: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
 
-          css = r'''
-          .hm-stable-clock {
-            display: block !important;
-            position: relative !important;
-            z-index: 50 !important;
-            width: min(90%, 420px) !important;
-            box-sizing: border-box !important;
-            margin: 10px auto 0 !important;
-            padding: 10px 12px !important;
-            border-radius: 14px !important;
-            background: rgba(8, 12, 18, 0.94) !important;
-            color: #ffffff !important;
-            text-align: center !important;
-            font: 600 15px/1.5 system-ui, sans-serif !important;
-            opacity: 1 !important;
-            visibility: visible !important;
-            animation: none !important;
-            transition: none !important;
-            white-space: normal !important;
-            overflow: visible !important;
-          }
+.hm-order-actions {
+  position: relative !important;
+  z-index: 99999 !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 10px !important;
+  width: 100% !important;
+  margin: 14px 0 0 !important;
+  padding: 8px !important;
+  box-sizing: border-box !important;
+  clear: both !important;
+}
 
-          .hm-static-hidden {
-            animation: none !important;
-            transition: none !important;
-            opacity: 0 !important;
-            visibility: hidden !important;
-            pointer-events: none !important;
-          }
+.hm-send {
+  position: relative !important;
+  z-index: 100000 !important;
+  min-height: 48px !important;
+  width: 100% !important;
+  border: 1px solid rgba(70, 190, 255, 0.35) !important;
+  border-radius: 14px !important;
+  background: rgba(10, 30, 48, 0.96) !important;
+  color: #ffffff !important;
+  font: 700 15px/1.3 system-ui, sans-serif !important;
+  padding: 10px 12px !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+}
 
-          .hm-order-actions {
-            display: flex !important;
-            flex-wrap: wrap !important;
-            gap: 8px !important;
-            width: 100% !important;
-            margin-top: 12px !important;
-          }
+.hm-send:active {
+  transform: scale(0.98) !important;
+  box-shadow:
+    0 0 0 2px rgba(220, 40, 40, 0.20),
+    0 0 18px rgba(220, 40, 40, 0.28) !important;
+}
 
-          .hm-send {
-            min-height: 46px !important;
-            flex: 1 1 140px !important;
-            border: 0 !important;
-            border-radius: 12px !important;
-            padding: 10px 14px !important;
-            font: 700 14px/1.3 system-ui, sans-serif !important;
-            cursor: pointer !important;
-            touch-action: manipulation !important;
-          }
+.hm-music-playing {
+  box-shadow:
+    0 0 0 2px rgba(80, 190, 255, 0.25),
+    0 0 22px rgba(80, 190, 255, 0.40) !important;
+}
 
-          @media (hover: none) {
-            .hm-send:active {
-              transform: translateY(1px);
-              box-shadow:
-                0 0 0 2px rgba(220, 38, 38, 0.18),
-                0 0 16px rgba(220, 38, 38, 0.22);
-            }
-          }
+.hm-features-visible {
+  position: relative !important;
+  z-index: 10001 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
 
-          @media (max-width: 600px) {
-            .hm-stable-clock {
-              width: 90% !important;
-              font-size: 14px !important;
-            }
+nav,
+.bottom-nav,
+.bottom-navigation,
+.mobile-nav,
+.fixed-bottom {
+  z-index: 9000 !important;
+}
 
-            .hm-order-actions {
-              display: grid !important;
-              grid-template-columns: 1fr 1fr !important;
-            }
+nav a,
+nav button,
+.bottom-nav a,
+.bottom-nav button,
+.bottom-navigation a,
+.bottom-navigation button,
+.mobile-nav a,
+.mobile-nav button {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
 
-            .hm-send {
-              width: 100% !important;
-            }
-          }
-          '''
+@media (max-width: 600px) {
+  .hm-stable-clock {
+    width: 90% !important;
+    font-size: 14px !important;
+  }
 
-          output.write_text(css.strip() + "\n", encoding="utf-8")
-          print("CSS created:", output)
-          PY
+  .hm-order-actions {
+    grid-template-columns: 1fr 1fr !important;
+  }
 
-          test -s "$PROJECT/app/src/main/assets/css/hm-v6-stability.css"
+  .hm-send {
+    min-height: 48px !important;
+  }
+}
+CSS
 
-          echo "CSS OK"
+          test -s \
+            "$PROJECT/app/src/main/assets/css/hm-v6-final.css"
 
-      - name: Attach stability files
+          echo "FINAL CSS OK"
+
+      - name: Attach final files to V6
         shell: bash
         run: |
           set -e
@@ -400,12 +860,23 @@ jobs:
           from pathlib import Path
 
           path = Path(sys.argv[1])
-          html = path.read_text(encoding="utf-8")
 
-          css_tag = '<link rel="stylesheet" href="css/hm-v6-stability.css">'
-          js_tag = '<script src="js/hm-v6-stability.js"></script>'
+          html = path.read_text(
+              encoding="utf-8"
+          )
 
-          if "hm-v6-stability.css" not in html:
+          css_tag = (
+              '<link rel="stylesheet" '
+              'href="css/hm-v6-final.css">'
+          )
+
+          js_tag = (
+              '<script '
+              'src="js/hm-v6-final.js">'
+              '</script>'
+          )
+
+          if "hm-v6-final.css" not in html:
               if "</head>" in html:
                   html = html.replace(
                       "</head>",
@@ -413,9 +884,13 @@ jobs:
                       1
                   )
               else:
-                  html = css_tag + "\n" + html
+                  html = (
+                      css_tag +
+                      "\n" +
+                      html
+                  )
 
-          if "hm-v6-stability.js" not in html:
+          if "hm-v6-final.js" not in html:
               if "</body>" in html:
                   html = html.replace(
                       "</body>",
@@ -423,16 +898,46 @@ jobs:
                       1
                   )
               else:
-                  html = html + "\n" + js_tag
+                  html = (
+                      html +
+                      "\n" +
+                      js_tag
+                  )
 
-          path.write_text(html, encoding="utf-8")
-          print("HTML patched:", path)
+          path.write_text(
+              html,
+              encoding="utf-8"
+          )
+
+          print(
+              "Final JS/CSS attached successfully"
+          )
           PY
 
-          grep -q "hm-v6-stability.css" "$INDEX"
-          grep -q "hm-v6-stability.js" "$INDEX"
+          grep -q \
+            "hm-v6-final.css" \
+            "$INDEX"
 
-          echo "STABILITY FILES ATTACHED"
+          grep -q \
+            "hm-v6-final.js" \
+            "$INDEX"
+
+          echo "FINAL PATCH ATTACHED"
+
+      - name: Verify audio
+        shell: bash
+        run: |
+          set -e
+
+          AUDIO="$PROJECT/app/src/main/assets/audio/ambient.mp3"
+
+          if [ ! -f "$AUDIO" ]; then
+            echo "WARNING: ambient.mp3 NOT FOUND"
+            echo "Music button will still exist but audio file is unavailable."
+          else
+            echo "AUDIO FOUND:"
+            ls -lh "$AUDIO"
+          fi
 
       - name: Build APK
         shell: bash
@@ -442,7 +947,7 @@ jobs:
           cd "$PROJECT"
 
           echo "========================================"
-          echo "BUILDING HM STUDIO V6"
+          echo "BUILDING HM STUDIO V6 FINAL"
           echo "========================================"
 
           gradle :app:assembleDebug \
@@ -451,17 +956,22 @@ jobs:
             --warning-mode all \
             --console=plain
 
+          echo "========================================"
           echo "BUILD FINISHED"
+          echo "========================================"
 
       - name: Verify APK
         shell: bash
         run: |
           set -e
 
-          APK="$(find "$PROJECT/app/build/outputs/apk" \
-            -type f \
-            -name '*.apk' \
-            -print -quit)"
+          APK="$(
+            find "$PROJECT/app/build/outputs/apk" \
+              -type f \
+              -name '*.apk' \
+              -print \
+              | head -n 1
+          )"
 
           if [ -z "$APK" ]; then
             echo "========================================"
@@ -478,22 +988,24 @@ jobs:
 
           echo "========================================"
           echo "APK FOUND"
-          echo "========================================"
           echo "$APK"
+          echo "========================================"
 
           mkdir -p apk-output
 
           cp "$APK" \
-            apk-output/hm-studio-v6-stable-debug.apk
+            apk-output/hm-studio-v6-final-debug.apk
 
-          test -s apk-output/hm-studio-v6-stable-debug.apk
+          test -s \
+            apk-output/hm-studio-v6-final-debug.apk
 
-          ls -lh apk-output/hm-studio-v6-stable-debug.apk
+          ls -lh \
+            apk-output/hm-studio-v6-final-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: hm-studio-v6-stable-debug
-          path: apk-output/hm-studio-v6-stable-debug.apk
+          name: hm-studio-v6-final-debug
+          path: apk-output/hm-studio-v6-final-debug.apk
           if-no-files-found: error
           retention-days: 14
