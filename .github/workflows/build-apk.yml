@@ -37,8 +37,6 @@ jobs:
             exit 1
           fi
 
-          echo "V6 ZIP: $ZIP"
-
           rm -rf v6-project
           mkdir -p v6-project
 
@@ -47,8 +45,7 @@ jobs:
           PROJECT="$(find v6-project -type f -name 'settings.gradle' -print -quit | xargs -r dirname)"
 
           if [ -z "$PROJECT" ]; then
-            echo "ERROR: settings.gradle NOT FOUND"
-            find v6-project -maxdepth 6 -type f | sort | head -200
+            echo "ERROR: Android project not found"
             exit 1
           fi
 
@@ -58,64 +55,232 @@ jobs:
 
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
 
-          echo "=============================="
-          echo "ANDROID PROJECT:"
-          echo "$PROJECT"
-          echo "=============================="
+          echo "PROJECT: $PROJECT"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
 
-      - name: Verify Android Project
+      - name: Verify Project
         shell: bash
         run: |
           set -e
           cd "$PROJECT"
 
-          echo "Gradle version:"
           gradle --version
 
           test -f settings.gradle
           test -f app/build.gradle
           test -f app/src/main/AndroidManifest.xml
 
-          echo "ANDROID PROJECT OK"
+          echo "PROJECT OK"
 
-      - name: Create Mobile JavaScript
+      - name: Create Mobile JS
         shell: bash
         run: |
           set -e
 
-          mkdir -p "$PROJECT/app/src/main/assets/js"
+          FILE="$PROJECT/app/src/main/assets/js/mobile-stability.js"
 
-          echo 'KGZ1bmN0aW9uKCl7CiJ1c2Ugc3RyaWN0IjsKZnVuY3Rpb24gdHh0KHMpe3JldHVybiBTdHJpbmcoc3x8IiIpLnJlcGxhY2UoL1xzKy9nLCIgIikudHJpbSgpO30KZnVuY3Rpb24gbGlua3MoKXsKIGxldCB3YT0iIixtYWlsPSIiOwogZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgiYVtocmVmXSIpLmZvckVhY2goYT0+ewogIGNvbnN0IGg9YS5nZXRBdHRyaWJ1dGUoImhyZWYiKXx8IiI7CiAgaWYoIXdhJiYvd2FcLm1lfHdoYXRzYXBwL2kudGVzdChoKSl3YT1oOwogIGlmKCFtYWlsJiYvXm1haWx0bzo/iLnRlc3QoaCkpIG1haWw9aC5yZXBsYWNlKC9ebWFpbHRvOi9pLCIiKS5zcGxpdCgiPyIpWzBdOwogfSk7CiByZXR1cm4ge3dhLG1haWx9Owp9CmZ1bmN0aW9uIGNvbGxlY3Qocm9vdCl7CiBjb25zdCBvdXQ9W107CiByb290LnF1ZXJ5U2VsZWN0b3JBbGwoImlucHV0LHNlbGVjdCx0ZXh0YXJlYSIpLmZvckVhY2goZT0+ewogIGlmKGUuZGlzYWJsZWR8fGUudHlwZT09PSJoaWRkZW4iKXJldHVybjsKICBjb25zdCB2PXR4dChlLnZhbHVlKTtpZighdilyZXR1cm47CiAgY29uc3Qgbj10eHQoZS5nZXRBdHRyaWJ1dGUoImFyaWEtbGFiZWwiKXx8ZS5nZXRBdHRyaWJ1dGUoIm5hbWUiKXx8ZS5nZXRBdHRyaWJ1dGUoInBsYWNlaG9sZGVyIil8fCIiKTsKICBvdXQucHVzaChuP24rIjogIit2OnYpOwogfSk7CiByZXR1cm4gb3V0LmpvaW4oIlxuIik7Cn0KZnVuY3Rpb24gcGFuZWwobWVzc2FnZSl7CiBjb25zdCBvbGQ9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoImhtLXNlbmQtcGFuZWwiKTtpZihvbGQpb2xkLnJlbW92ZSgpOwogY29uc3QgcD1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCJkaXYiKTtwLmlkPSJobS1zZW5kLXBhbmVsIjtwLmRpcj0icnRsIjsKIHAuaW5uZXJIVE1MPSc8ZGl2IGNsYXNzPSJobS1zZW5kLXRpdGxlIj7Yp9ix2LPYp9mEINiv2LHYrtmI2KfYs9iqINm+2LHZiNqY2Yc8L2Rpdj48ZGl2IGNsYXNzPSJobS1zZW5kLXRleHQiPtix2YjYtCDYp9ix2LPYp9mEINix2Kcg2KfZhtiq2K7Yp9ioINqp2YbbjNivPC9kaXY+PGRpdiBjbGFzcz0iaG0tc2VuZC1hY3Rpb25zIj48YnV0dG9uIGRhdGEtc2VuZD0id2EiPtmI2KfYqtiz2KfZvjwvYnV0dG9uPjxidXR0b24gZGF0YS1zZW5kPSJzbXMiPtm+24zYp9mF2qk8L2J1dHRvbj48YnV0dG9uIGRhdGEtc2VuZD0ibWFpbCI+2KfbjNmF24zZhDwvYnV0dG9uPjxidXR0b24gZGF0YS1zZW5kPSJjbG9zZSI+2KjYs9iq2YY8L2J1dHRvbj48L2Rpdj4nOwogZG9jdW1lbnQuYm9keS5hcHBlbmRDaGlsZChwKTsKIGNvbnN0IGw9bGlua3MoKSxlPWVuY29kZVVSSUNvbXBvbmVudChtZXNzYWdlKTsKIHAuYWRkRXZlbnRMaXN0ZW5lcigiY2xpY2siLHg9PnsKICBjb25zdCBiPXgudGFyZ2V0LmNsb3Nlc3QoIltkYXRhLXNlbmRdIik7aWYoIWIpcmV0dXJuOwogIGNvbnN0IHQ9Yi5kYXRhc2V0LnNlbmQ7aWYodD09PSJjbG9zZSIpe3AucmVtb3ZlKCk7cmV0dXJufQogIGxldCB1PSIiOwogIGlmKHQ9PT0id2EiKXU9bC53YT9sLndhKyhsLndhLmluY2x1ZGVzKCI/Iik/IiYiOiI/IikrInRleHQ9IitlOiJodHRwczovL3dhLm1lLz90ZXh0PSIrZTsKICBpZih0PT09InNtcyIpdT0ic21zOj9ib2R5PSIrZTsKICBpZih0PT09Im1haWwiKXU9Im1haWx0bzoiKyhsLm1haWx8fCIiKSsiP3N1YmplY3Q9IitlbmNvZGVVUklDb21wb25lbnQoItiv2LHYrtmI2KfYs9iqINm+2LHZiNqY2YcgSE0gU3R1ZGlvIikrIiZib2R5PSIrZTsKICB3aW5kb3cubG9jYXRpb24uaHJlZj11OwogfSk7Cn0KZnVuY3Rpb24gb3JkZXJCdXR0b24oZSl7CiBjb25zdCB0PXR4dChlLmlubmVyVGV4dHx8ZS50ZXh0Q29udGVudCk7CiByZXR1cm4gL9in2LHYs9in2YQg2K/Ysdiu2YjYp9iz2Kog2b7YsdmI2pjZh3zYr9ix2K7ZiNin2LPYqiDZvtix2YjamNmHfG9yZGVyIHByb2plY3R8cHJvamVjdCByZXF1ZXN0fHNlbmQgcmVxdWVzdC9pLnRlc3QodCk7Cn0KZnVuY3Rpb24gb3JkZXJDbGljayhlKXsKIGNvbnN0IGI9ZS50YXJnZXQuY2xvc2VzdCgiYnV0dG9uLGEiKTtpZighYnx8IW9yZGVyQnV0dG9uKGIpKXJldHVybjsKIGNvbnN0IHJvb3Q9Yi5jbG9zZXN0KCJmb3JtIil8fGIucGFyZW50RWxlbWVudD8ucGFyZW50RWxlbWVudHx8ZG9jdW1lbnQuYm9keTsKIGNvbnN0IG09Y29sbGVjdChyb290KXx8Y29sbGVjdChkb2N1bWVudC5ib2R5KTsKIGlmKCFtKXJldHVybjsKIGUucHJldmVudERlZmF1bHQoKTtlLnN0b3BQcm9wYWdhdGlvbigpO3BhbmVsKCLYr9ix2K7ZiNin2LPYqiDZvtix2YjamNmHXG5cbiIrbSk7Cn0KZnVuY3Rpb24gbXVzaWMoKXsKIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoImJ1dHRvbixhLFtyb2xlPWJ1dHRvbl0iKS5mb3JFYWNoKGI9PnsKICBjb25zdCB0PXR4dChiLmlubmVyVGV4dHx8Yi50ZXh0Q29udGVudCk7CiAgaWYoIS/Yhti12Kgg2KfZvtmE24zaqduM2LTZhnxpbnN0YWxsIGFwcC9pLnRlc3QodCkpcmV0dXJuOwogIGIudGV4dENvbnRlbnQ9IuKZqiI7Yi5zZXRBdHRyaWJ1dGUoImFyaWEtbGFiZWwiLCLYotmH2YbaryIpO2IudGl0bGU9Itii2YfZhtqvIjtiLmNsYXNzTGlzdC5hZGQoImhtLW11c2ljLWJ1dHRvbiIpOwogIGIuYWRkRXZlbnRMaXN0ZW5lcigiY2xpY2siLGU9PnsKICAgZS5wcmV2ZW50RGVmYXVsdCgpO2Uuc3RvcFByb3BhZ2F0aW9uKCk7CiAgIGlmKCF3aW5kb3cuX19obUF1ZGlvKXt3aW5kb3cuX19obUF1ZGlvPW5ldyBBdWRpbygiYXNzZXRzL2F1ZGlvL2FtYmllbnQubXAzIik7d2luZG93Ll9faG1BdWRpby5sb29wPXRydWV9CiAgIGlmKHdpbmRvdy5fX2htQXVkaW8ucGF1c2VkKXt3aW5kb3cuX19obUF1ZGlvLnBsYXkoKS5jYXRjaCgoKT0+e30pO2IuY2xhc3NMaXN0LmFkZCgicGxheWluZyIpfQogICBlbHNle3dpbmRvdy5fX19obUF1ZGlvLnBhdXNlKCk7Yi5jbGFzc2xpc3QucmVtb3ZlKCJwbGF5aW5nIil9CiAgfSx0cnVlKTsKICB9KTsKfQpmdW5jdGlvbiBib3R0b20oKXsKIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoImJvZHkgKiIpLmZvckVhY2goZT0+ewogIGNvbnN0IHQ9dHh0KGUudGV4dENvbnRlbnQpOwogIGlmKHQ9PT0i2KfZhNin2YbYp9iqInx8dD09PSJGZWF0dXJlcyJ8fHQ9PT0i2KfZhNmF2YrYstin2KoiKXsKICAgIGlmKGUuY2hpbGRyZW4ubGVuZ3RoPT09MCllLnN0eWxlLnZpc2liaWxpdHk9InZpc2libGUiOwogICAgZS5jbGFzc0xpc3QuYWRkKCJobS1mZWF0dXJlcy12aXNpYmxlIik7CiAgIH0KIH0pOwp9CmZ1bmN0aW9uIGNsb2NrKCl7CiBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCJib2R5ICoiKS5mb3JFYWNoKGU9PnsKICBpZihlLmNoaWxkcmVuLmxlbmd0aD4wKXJldHVybjsKICBjb25zdCB0PXR4dChlLnRleHRDb250ZW50KTsKICBpZigvXGJcZHsxLDJ9OlxkezJ9XGIvLnRlc3QodCl8fC/Ys9in2LnYqnzYstmF2KfZhnx0aW1lfGNsb2NrfGRhdGUvaS50ZXN0KGUuY2xhc3NOYW1lKyIgIitlLmlkKSl7CiAgIGUuY2xhc3NMaXN0LmFkZCgiaG0tc3RhYmxlLWluZm8iKTsKICB9CiB9KTsKfQpmdW5jdGlvbiBzZXR1cCgpewogbXVzaWMoKTtib3R0b20oKTtjbG9jaygpOwogZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcigiY2xpY2siLG9yZGVyQ2xpY2ssdHJ1ZSk7CiBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCJmb3JtIikuZm9yRWFjaChmPT57CiAgZi5hZGRFdmVudExpc3RlbmVyKCJzdWJtaXQiLGU9PnsKICAgY29uc3QgdD10eHQoZi5pbm5lclRleHR8fCIiKTsKICAgaWYoL9mG2YjYuSDZvtix2YjamNmHfNio2YjYr9is2Yd82KrZiNi224zYrdin2Kog2b7YsdmI2pjZh3xwcm9qZWN0IHR5cGV8YnVkZ2V0fHByb2plY3QgZGVzY3JpcHRpb24vaS50ZXN0KHQpKXsKICAgIGUucHJldmVudERlZmF1bHQoKTtlLnN0b3BQcm9wYWdhdGlvbigpOwogICAgcGFuZWwoItiv2LHYrtmI2KfYs9iqINm+2LHZiNqY2YdcblxuIitjb2xsZWN0KGYpKTsKICAgfQogIH0sdHJ1ZSk7CiB9KTsKfQppZihkb2N1bWVudC5yZWFkeVN0YXRlPT09ImxvYWRpbmciKWRvY3VtZW50LmFkZEV2ZW50TGlzdGVuZXIoIkRPTUNvbnRlbnRMb2FkZWQiLHNldHVwKTtlbHNlIHNldHVwKCk7Cn0pKCk7' | base64 -d > "$PROJECT/app/src/main/assets/js/mobile-stability.js"
+          mkdir -p "$(dirname "$FILE")"
 
-          test -s "$PROJECT/app/src/main/assets/js/mobile-stability.js"
+          printf '%s\n' \
+          '(function(){' \
+          '"use strict";' \
+          'function txt(e){return String(e&&e.textContent||"").replace(/\s+/g," ").trim();}' \
+          'function getLinks(){' \
+          'var wa="";' \
+          'var mail="";' \
+          'document.querySelectorAll("a[href]").forEach(function(a){' \
+          'var h=a.getAttribute("href")||"";' \
+          'if(!wa&&/wa\.me|whatsapp/i.test(h))wa=h;' \
+          'if(!mail&&/^mailto:/i.test(h))mail=h.substring(7).split("?")[0];' \
+          '});' \
+          'return {wa:wa,mail:mail};' \
+          '}' \
+          'function values(root){' \
+          'var out=[];' \
+          'root.querySelectorAll("input,select,textarea").forEach(function(e){' \
+          'if(e.disabled||e.type==="hidden")return;' \
+          'var v=String(e.value||"").trim();' \
+          'if(!v)return;' \
+          'var n=e.getAttribute("aria-label")||e.getAttribute("name")||e.getAttribute("placeholder")||"اطلاعات";' \
+          'out.push(n+": "+v);' \
+          '});' \
+          'return out.join("\n");' \
+          '}' \
+          'function sendPanel(message){' \
+          'var old=document.getElementById("hm-send-panel");' \
+          'if(old)old.remove();' \
+          'var p=document.createElement("div");' \
+          'p.id="hm-send-panel";' \
+          'p.innerHTML="<div class=\"hm-send-title\">ارسال درخواست پروژه</div><div class=\"hm-send-text\">روش ارسال را انتخاب کنید</div><div class=\"hm-send-actions\"><button data-send=\"wa\">واتساپ</button><button data-send=\"sms\">پیامک</button><button data-send=\"mail\">ایمیل</button><button data-send=\"close\">بستن</button></div>";' \
+          'document.body.appendChild(p);' \
+          'var l=getLinks();' \
+          'var encoded=encodeURIComponent(message);' \
+          'p.addEventListener("click",function(e){' \
+          'var b=e.target.closest("[data-send]");' \
+          'if(!b)return;' \
+          'var type=b.dataset.send;' \
+          'if(type==="close"){p.remove();return;}' \
+          'var url="";' \
+          'if(type==="wa")url=l.wa?(l.wa+(l.wa.indexOf("?")>=0?"&":"?")+"text="+encoded):"https://api.whatsapp.com/send?text="+encoded;' \
+          'if(type==="sms")url="sms:?body="+encoded;' \
+          'if(type==="mail")url="mailto:"+(l.mail||"")+"?subject="+encodeURIComponent("درخواست پروژه HM Studio")+"&body="+encoded;' \
+          'window.location.href=url;' \
+          '});' \
+          '}' \
+          'function isOrderButton(e){' \
+          'return /ارسال درخواست پروژه|درخواست پروژه|project request|send request/i.test(txt(e));' \
+          '}' \
+          'function music(){' \
+          'document.querySelectorAll("button,a,[role=button]").forEach(function(b){' \
+          'if(!/نصب اپلیکیشن|install app/i.test(txt(b)))return;' \
+          'if(b.dataset.hmMusic)return;' \
+          'b.dataset.hmMusic="1";' \
+          'b.textContent="♪";' \
+          'b.setAttribute("aria-label","آهنگ");' \
+          'b.title="آهنگ";' \
+          'b.addEventListener("click",function(e){' \
+          'e.preventDefault();' \
+          'e.stopPropagation();' \
+          'if(!window.hmAudio){' \
+          'window.hmAudio=new Audio("assets/audio/ambient.mp3");' \
+          'window.hmAudio.loop=true;' \
+          '}' \
+          'if(window.hmAudio.paused){' \
+          'window.hmAudio.play().catch(function(){});' \
+          'b.classList.add("hm-playing");' \
+          '}else{' \
+          'window.hmAudio.pause();' \
+          'b.classList.remove("hm-playing");' \
+          '}' \
+          '},true);' \
+          '});' \
+          '}' \
+          'function orders(){' \
+          'document.addEventListener("click",function(e){' \
+          'var b=e.target.closest("button,a,[role=button]");' \
+          'if(!b||!isOrderButton(b))return;' \
+          'var root=b.closest("form")||document.body;' \
+          'var data=values(root)||values(document.body);' \
+          'e.preventDefault();' \
+          'e.stopPropagation();' \
+          'sendPanel("سلام\nدرخواست پروژه HM Studio\n\n"+data);' \
+          '},true);' \
+          'document.querySelectorAll("form").forEach(function(f){' \
+          'f.addEventListener("submit",function(e){' \
+          'var data=values(f);' \
+          'if(/project|order|بودجه|نوع پروژه|توضیحات پروژه|درخواست/i.test(txt(f))){' \
+          'e.preventDefault();' \
+          'sendPanel("سلام\nدرخواست پروژه HM Studio\n\n"+data);' \
+          '}' \
+          '},true);' \
+          '});' \
+          '}' \
+          'function stable(){' \
+          'document.querySelectorAll("*").forEach(function(e){' \
+          'if(e.children.length!==0)return;' \
+          'var t=txt(e);' \
+          'if(/\b\d{1,2}:\d{2}\b/.test(t)||/clock|time|date/i.test(String(e.className)+" "+e.id))e.classList.add("hm-stable-info");' \
+          '});' \
+          '}' \
+          'function start(){' \
+          'music();' \
+          'orders();' \
+          'stable();' \
+          'setInterval(stable,1500);' \
+          '}' \
+          'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();' \
+          '})();' \
+          > "$FILE"
+
+          test -s "$FILE"
+
+          echo "JS CREATED"
 
       - name: Create Mobile CSS
         shell: bash
         run: |
           set -e
 
-          echo 'I2htLXNlbmQtcGFuZWx7cG9zaXRpb246Zml4ZWQ7ei1pbmRleDoyMTQ3NDgzNjQ3O2xlZnQ6MTZweDtyaWdodDoxNnB4O2JvdHRvbTo4OHB4O3BhZGRpbmc6MThweDtib3JkZXI6MXB4IHNvbGlkIHJnYmEoODAsMTkwLDI1NSwuMzUpO2JvcmRlci1yYWRpdXM6MjJweDtiYWNrZ3JvdW5kOnJnYmEoMywxOCwzMSwuOTgpO2JveC1zaGFkb3c6MCAxOHB4IDUwcHggcmdiYSgwLDAsMCwuNDUpO2ZvbnQtZmFtaWx5OmluaGVyaXQ7Y29sb3I6I2ZmZjt0ZXh0LWFsaWduOmNlbnRlcn0jaG0tc2VuZC1wYW5lbCAuaG0tc2VuZC10aXRsZXtmb250LXNpemU6MjBweDtmb250LXdlaWdodDo4MDA7bWFyZ2luLWJvdHRvbTo3cHh9I2htLXNlbmQtcGFuZWwgLmhtLXNlbmQtdGV4dHtvcGFjaXR5Oi44O21hcmdpbi1ib3R0b206MTRweH0uaG0tc2VuZC1hY3Rpb25ze2Rpc3BsYXk6Z3JpZDtncmlkLXRlbXBsYXRlLWNvbHVtbnM6MWZyIDFmcjtnYXA6MTBweH0uaG0tc2VuZC1hY3Rpb25zIGJ1dHRvbnttaW4taGVpZ2h0OjUycHg7Ym9yZGVyOjFweCBzb2xpZCByZ2JhKDgwLDE5MCwyNTUsLjQpO2JvcmRlci1yYWRpdXM6MTVweDtiYWNrZ3JvdW5kOiMwNzFjMmQ7Y29sb3I6I2ZmZjtmb250OmluaGVyaXQ7Zm9udC13ZWlnaHQ6NzAwfS5obS1zZW5kLWFjdGlvbnMgYnV0dG9uOmFjdGl2ZXt0cmFuc2Zvcm06c2NhbGUoLjk3KTtib3gtc2hhZG93OjAgMCAxOHB4IHJnYmEoMjU1LDQwLDQwLC4zNSl9LmhtLW11c2ljLWJ1dHRvbi5wbGF5aW5ne2JveC1zaGFkb3c6MCAwIDAgMnB4IHJnYmEoNjAsMTkwLDI1NSwuMzUpLDAgMCAyNHB4IHJnYmEoNjAsMTkwLDI1NSwuMzUpIWltcG9ydGFudH0uaG0tc3RhYmxlLWluZm97YW5pbWF0aW9uOm5vbmUhaW1wb3J0YW50O3RyYW5zaXRpb246bm9uZSFpbXBvcnRhbnQ7b3BhY2l0eToxIWltcG9ydGFudDt2aXNpYmlsaXR5OnZpc2libGUhaW1wb3J0YW50O3RyYW5zZm9ybTpub25lIWltcG9ydGFudH0uaG0tZmVhdHVyZXMtdmlzaWJsZXt2aXNpYmlsaXR5OnZpc2libGUhaW1wb3J0YW50O29wYWNpdHk6MSFpbXBvcnRhbnQ7ZGlzcGxheTpibG9jayFpbXBvcnRhbnR9' | base64 -d > "$PROJECT/app/src/main/assets/css/mobile-stability.css"
+          FILE="$PROJECT/app/src/main/assets/css/mobile-stability.css"
 
-          test -s "$PROJECT/app/src/main/assets/css/mobile-stability.css"
+          mkdir -p "$(dirname "$FILE")"
 
-      - name: Attach Stability Files
+          printf '%s\n' \
+          '#hm-send-panel{' \
+          'position:fixed;' \
+          'left:14px;' \
+          'right:14px;' \
+          'bottom:88px;' \
+          'z-index:2147483647;' \
+          'padding:18px;' \
+          'border:1px solid rgba(80,190,255,.4);' \
+          'border-radius:22px;' \
+          'background:rgba(3,18,31,.98);' \
+          'box-shadow:0 18px 50px rgba(0,0,0,.45);' \
+          'color:#fff;' \
+          'text-align:center;' \
+          'font-family:inherit;' \
+          '}' \
+          '#hm-send-panel .hm-send-title{' \
+          'font-size:20px;' \
+          'font-weight:800;' \
+          'margin-bottom:8px;' \
+          '}' \
+          '#hm-send-panel .hm-send-text{' \
+          'opacity:.8;' \
+          'margin-bottom:14px;' \
+          '}' \
+          '.hm-send-actions{' \
+          'display:grid;' \
+          'grid-template-columns:1fr 1fr;' \
+          'gap:10px;' \
+          '}' \
+          '.hm-send-actions button{' \
+          'min-height:52px;' \
+          'border:1px solid rgba(80,190,255,.4);' \
+          'border-radius:15px;' \
+          'background:#071c2d;' \
+          'color:#fff;' \
+          'font:inherit;' \
+          'font-weight:700;' \
+          '}' \
+          '.hm-send-actions button:active{' \
+          'transform:scale(.97);' \
+          'box-shadow:0 0 18px rgba(255,50,50,.35);' \
+          '}' \
+          '.hm-playing{' \
+          'box-shadow:0 0 22px rgba(60,190,255,.65)!important;' \
+          '}' \
+          '.hm-stable-info{' \
+          'animation:none!important;' \
+          'transition:none!important;' \
+          'opacity:1!important;' \
+          'visibility:visible!important;' \
+          'transform:none!important;' \
+          '}' \
+          > "$FILE"
+
+          test -s "$FILE"
+
+          echo "CSS CREATED"
+
+      - name: Attach Mobile Files
         shell: bash
         run: |
           set -e
 
           INDEX="$PROJECT/app/src/main/assets/index.html"
 
-          python3 -c "from pathlib import Path; p=Path('$INDEX'); s=p.read_text(encoding='utf-8'); a='<link rel=\"stylesheet\" href=\"css/mobile-stability.css\">'; b='<script src=\"js/mobile-stability.js\" defer></script>'; s=s if 'mobile-stability.css' in s else s.replace('</head>',a+'\\n</head>'); s=s if 'mobile-stability.js' in s else s.replace('</body>',b+'\\n</body>'); p.write_text(s,encoding='utf-8')"
+          python3 -c 'from pathlib import Path; p=Path("'"$INDEX"'"); s=p.read_text(encoding="utf-8"); css="<link rel=\"stylesheet\" href=\"css/mobile-stability.css\">"; js="<script src=\"js/mobile-stability.js\" defer></script>"; s=s if "mobile-stability.css" in s else s.replace("</head>",css+"</head>"); s=s if "mobile-stability.js" in s else s.replace("</body>",js+"</body>"); p.write_text(s,encoding="utf-8")'
 
           grep -q "mobile-stability.css" "$INDEX"
           grep -q "mobile-stability.js" "$INDEX"
 
-          echo "STABILITY FILES ATTACHED"
+          echo "FILES ATTACHED"
 
       - name: Build APK
         shell: bash
@@ -138,16 +303,15 @@ jobs:
 
           if [ -z "$APK" ]; then
             echo "ERROR: APK NOT GENERATED"
-            find "$PROJECT/app/build" -maxdepth 8 -type f -print 2>/dev/null || true
+            find "$PROJECT/app/build" -type f -print || true
             exit 1
           fi
 
-          echo "APK FOUND:"
-          echo "$APK"
-
           mkdir -p release
+
           cp "$APK" release/HM-Studio-V6-Final.apk
 
+          echo "APK:"
           ls -lh release/HM-Studio-V6-Final.apk
 
       - name: Upload APK
