@@ -1,4 +1,4 @@
-name: HM Studio V6 Final
+name: HM Studio V6 Final Polish
 
 on:
   workflow_dispatch:
@@ -29,28 +29,28 @@ jobs:
         run: |
           set -e
 
-          echo "Searching for V6 ZIP..."
+          echo "===================================="
+          echo "FINDING HM STUDIO V6"
+          echo "===================================="
 
           ZIP=$(find . -type f \
             -name 'hm-studio-app-v6-corrected.zip' \
+            -print \
             | head -n 1)
 
           if [ -z "$ZIP" ]; then
             echo "ERROR: V6 ZIP NOT FOUND"
-            echo "Available ZIP files:"
             find . -type f -name "*.zip" -print
             exit 1
           fi
 
-          echo "V6 ZIP:"
+          echo "Using:"
           echo "$ZIP"
 
           rm -rf v6
           mkdir -p v6
 
           unzip -q "$ZIP" -d v6
-
-          echo "Searching Android project..."
 
           PROJECT=$(find v6 \
             -type f \
@@ -60,60 +60,885 @@ jobs:
             | xargs -r dirname)
 
           if [ -z "$PROJECT" ]; then
-            echo "ERROR: Android project not found"
-            find v6 -maxdepth 5 -type f | head -n 200
+            echo "ERROR: ANDROID PROJECT NOT FOUND"
+            find v6 -maxdepth 5 -type f -print
             exit 1
           fi
 
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
 
-          echo "Project:"
+          echo "V6 PROJECT:"
           echo "$PROJECT"
 
-          test -f "$PROJECT/settings.gradle"
           test -f "$PROJECT/app/build.gradle"
           test -f "$PROJECT/app/src/main/AndroidManifest.xml"
           test -f "$PROJECT/app/src/main/assets/index.html"
 
-          echo "V6 PROJECT FOUND"
+          echo "V6 PROJECT OK"
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.11.1"
+      - name: Create Final Mobile CSS
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p "$PROJECT/app/src/main/assets/css"
+
+          cat > "$PROJECT/app/src/main/assets/css/final-mobile.css" <<'CSS'
+          /* HM STUDIO V6 — FINAL MOBILE POLISH */
+
+          html{
+            -webkit-text-size-adjust:100%;
+          }
+
+          button,a{
+            -webkit-tap-highlight-color:transparent;
+          }
+
+          @media(max-width:950px){
+
+            .header-tools{
+              gap:8px!important;
+              align-items:center!important;
+            }
+
+            /* سه کلید بالای صفحه دقیقاً هم اندازه:
+               تم / آهنگ / منو */
+
+            .header-tools .theme-toggle-btn,
+            .header-tools #installBtn,
+            .header-tools .menu-btn{
+              display:grid!important;
+              place-items:center!important;
+
+              width:46px!important;
+              height:46px!important;
+
+              min-width:46px!important;
+              min-height:46px!important;
+
+              max-width:46px!important;
+              max-height:46px!important;
+
+              flex:0 0 46px!important;
+
+              padding:0!important;
+              margin:0!important;
+
+              border-radius:16px!important;
+            }
+
+            /* دکمه‌های قدیمی جستجو و موسیقی پنهان؛
+               installBtn روی موبایل به دکمه آهنگ تبدیل می‌شود. */
+
+            .header-tools #searchBtn,
+            .header-tools #musicBtn{
+              display:none!important;
+            }
+
+            /* کلید زرد = آهنگ */
+
+            .header-tools #installBtn{
+              background:linear-gradient(
+                145deg,
+                #ffd45a,
+                #e9a928
+              )!important;
+
+              color:#101820!important;
+
+              border:1px solid rgba(
+                255,
+                225,
+                130,
+                .95
+              )!important;
+
+              box-shadow:
+                0 8px 24px
+                rgba(246,196,83,.28)!important;
+            }
+
+            .header-tools #installBtn span{
+              font-size:23px!important;
+              line-height:1!important;
+            }
+
+            .header-tools #installBtn b{
+              display:none!important;
+            }
+
+            .header-tools .theme-toggle-btn{
+              font-size:23px!important;
+              line-height:1!important;
+            }
+
+            .header-tools .menu-btn{
+              font-size:27px!important;
+              line-height:1!important;
+            }
+
+            /* چیدمان پایدار هیرو */
+
+            .hero{
+              padding-top:118px!important;
+              min-height:0!important;
+              display:block!important;
+            }
+
+            .hero-visual{
+              width:100%!important;
+              display:block!important;
+            }
+
+            .scene{
+              width:100%!important;
+              height:590px!important;
+              min-height:590px!important;
+
+              transform:none!important;
+              animation:none!important;
+
+              perspective:none!important;
+              overflow:visible!important;
+            }
+
+            /* حذف لایه‌های سنگین 5D و متن بزرگ
+               فقط در موبایل */
+
+            .scene .glass-console,
+            .scene .screen,
+            .scene .depth-layer,
+            .scene .holo-layer,
+            .scene::before,
+            .scene::after{
+              display:none!important;
+            }
+
+            /* عکس اصلی */
+
+            .hero-photo-wrap{
+              z-index:10!important;
+
+              width:90%!important;
+              height:365px!important;
+
+              right:5%!important;
+              top:0!important;
+
+              transform:none!important;
+            }
+
+            .hero-photo{
+              width:100%!important;
+              height:365px!important;
+
+              object-fit:cover!important;
+              object-position:center top!important;
+
+              border-radius:24px!important;
+
+              mask-image:
+                linear-gradient(
+                  to bottom,
+                  #000 88%,
+                  transparent 100%
+                )!important;
+            }
+
+            .photo-glow{
+              display:none!important;
+            }
+
+            /* گوی آبی ثابت */
+
+            .data-orb{
+              z-index:12!important;
+
+              width:78px!important;
+              height:78px!important;
+
+              right:3%!important;
+              top:250px!important;
+
+              animation:none!important;
+            }
+
+            .data-orb:before,
+            .data-orb:after{
+              display:none!important;
+            }
+
+            /* پنل ثابت ساعت و تاریخ */
+
+            .hud-depth.v6-final-clock{
+              position:absolute!important;
+
+              z-index:30!important;
+
+              top:382px!important;
+
+              left:5%!important;
+              right:5%!important;
+
+              bottom:auto!important;
+
+              width:90%!important;
+              min-width:0!important;
+
+              display:grid!important;
+
+              grid-template-columns:
+                1fr 1fr!important;
+
+              gap:8px!important;
+
+              padding:13px 14px!important;
+
+              margin:0!important;
+
+              transform:none!important;
+
+              border-radius:18px!important;
+
+              border:
+                1px solid
+                rgba(110,210,255,.28)!important;
+
+              background:
+                rgba(3,14,27,.94)!important;
+
+              backdrop-filter:
+                blur(18px)!important;
+
+              -webkit-backdrop-filter:
+                blur(18px)!important;
+
+              box-shadow:
+                0 16px 45px
+                rgba(0,0,0,.34),
+                inset 0 0 24px
+                rgba(66,184,255,.07)!important;
+            }
+
+            .hud-depth.v6-final-clock>div{
+              min-width:0!important;
+              overflow:hidden!important;
+            }
+
+            .hud-depth.v6-final-clock span{
+              display:block!important;
+
+              color:#8fb8cf!important;
+
+              font-size:9px!important;
+
+              line-height:1.3!important;
+
+              letter-spacing:.04em!important;
+
+              white-space:nowrap!important;
+            }
+
+            .hud-depth.v6-final-clock b,
+            .hud-depth.v6-final-clock strong,
+            .hud-depth.v6-final-clock small{
+              font-variant-numeric:
+                tabular-nums!important;
+
+              font-feature-settings:
+                "tnum" 1!important;
+            }
+
+            .hud-depth.v6-final-clock b{
+              display:block!important;
+
+              margin-top:3px!important;
+
+              color:#eaf8ff!important;
+
+              font-size:17px!important;
+
+              line-height:1.35!important;
+
+              white-space:nowrap!important;
+            }
+
+            .hud-depth.v6-final-clock
+            .calendar-live{
+              grid-column:1/-1!important;
+
+              padding-top:8px!important;
+
+              border-top:
+                1px solid
+                rgba(156,231,255,.13)!important;
+            }
+
+            .hud-depth.v6-final-clock
+            .calendar-live strong{
+              display:block!important;
+
+              color:#bdeaff!important;
+
+              font-size:14px!important;
+
+              line-height:1.45!important;
+
+              white-space:nowrap!important;
+
+              overflow:hidden!important;
+
+              text-overflow:ellipsis!important;
+            }
+
+            .hud-depth.v6-final-clock
+            .calendar-live small{
+              display:block!important;
+
+              margin-top:2px!important;
+
+              color:#829caf!important;
+
+              font-size:10px!important;
+            }
+
+            /* امکانات بالای نوار پایین قرار می‌گیرد */
+
+            .command-fab{
+              z-index:10060!important;
+
+              bottom:82px!important;
+
+              inset-inline-end:14px!important;
+
+              min-height:44px!important;
+
+              padding:9px 13px!important;
+
+              border-radius:16px!important;
+
+              background:
+                rgba(5,18,32,.96)!important;
+
+              border:
+                1px solid
+                rgba(66,184,255,.35)!important;
+
+              box-shadow:
+                0 10px 28px
+                rgba(0,0,0,.42)!important;
+            }
+
+            .command-panel{
+              z-index:10061!important;
+
+              bottom:138px!important;
+
+              inset-inline-end:14px!important;
+
+              width:
+                calc(100vw - 28px)!important;
+
+              max-height:
+                calc(100dvh - 190px)!important;
+
+              overflow:auto!important;
+            }
+
+            /* افکت قرمز فقط لحظه لمس */
+
+            .v6-touch-red{
+              animation:
+                v6RedTouch
+                .18s
+                ease-out!important;
+            }
+
+            @keyframes v6RedTouch{
+
+              0%{
+                box-shadow:
+                  0 0 0 0
+                  rgba(255,55,55,0),
+                  0 0 0
+                  rgba(255,55,55,0);
+              }
+
+              45%{
+                box-shadow:
+                  0 0 0 3px
+                  rgba(255,55,55,.38),
+                  0 0 22px
+                  rgba(255,55,55,.32);
+              }
+
+              100%{
+                box-shadow:
+                  0 0 0 0
+                  rgba(255,55,55,0),
+                  0 0 0
+                  rgba(255,55,55,0);
+              }
+            }
+
+            /* ساعت و پنل دیگر رقص و انیمیشن ندارند */
+
+            .hud-depth,
+            .hud-depth *{
+              animation:none!important;
+              transition:none!important;
+            }
+
+            .sky-orb,
+            .orbital-bg,
+            .pulse,
+            .ticker div,
+            .side-float{
+              animation:none!important;
+            }
+          }
+
+          @media(max-width:600px){
+
+            .header{
+              height:68px!important;
+            }
+
+            .header-tools .theme-toggle-btn,
+            .header-tools #installBtn,
+            .header-tools .menu-btn{
+              width:45px!important;
+              height:45px!important;
+
+              min-width:45px!important;
+              min-height:45px!important;
+
+              max-width:45px!important;
+              max-height:45px!important;
+            }
+
+            .scene{
+              height:585px!important;
+              min-height:585px!important;
+            }
+
+            .hero-photo-wrap{
+              height:350px!important;
+            }
+
+            .hero-photo{
+              height:350px!important;
+            }
+
+            .data-orb{
+              top:238px!important;
+
+              width:72px!important;
+              height:72px!important;
+            }
+
+            .hud-depth.v6-final-clock{
+              top:365px!important;
+            }
+
+            .hud-depth.v6-final-clock b{
+              font-size:16px!important;
+            }
+
+            .hud-depth.v6-final-clock
+            .calendar-live strong{
+              font-size:13px!important;
+            }
+          }
+          CSS
+
+      - name: Create Final Mobile JavaScript
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p "$PROJECT/app/src/main/assets/js"
+
+          cat > "$PROJECT/app/src/main/assets/js/final-mobile.js" <<'JS'
+          (function(){
+
+            'use strict';
+
+            function $(selector){
+              return document.querySelector(selector);
+            }
+
+            function localeFor(lang){
+
+              if(lang === 'fa'){
+                return 'fa-IR';
+              }
+
+              if(lang === 'ar'){
+                return 'ar-EG';
+              }
+
+              return 'en-US';
+            }
+
+            function dateLocaleFor(lang){
+
+              if(lang === 'fa'){
+                return 'fa-IR-u-ca-persian';
+              }
+
+              if(lang === 'ar'){
+                return 'ar-EG-u-ca-gregory';
+              }
+
+              return 'en-US-u-ca-gregory';
+            }
+
+            function renderClockDate(){
+
+              const lang =
+                document.documentElement.lang ||
+                localStorage.getItem('hm-lang') ||
+                'fa';
+
+              const now = new Date();
+
+              const time =
+                new Intl.DateTimeFormat(
+                  localeFor(lang),
+                  {
+                    hour:'2-digit',
+                    minute:'2-digit',
+                    second:'2-digit',
+                    hour12:false
+                  }
+                ).format(now);
+
+              const date =
+                new Intl.DateTimeFormat(
+                  dateLocaleFor(lang),
+                  {
+                    weekday:'long',
+                    day:'numeric',
+                    month:'long',
+                    year:'numeric'
+                  }
+                ).format(now);
+
+              const shortDate =
+                new Intl.DateTimeFormat(
+                  dateLocaleFor(lang),
+                  {
+                    day:'numeric',
+                    month:'long',
+                    year:'numeric'
+                  }
+                ).format(now);
+
+              const clock =
+                $('#heroClock');
+
+              const dateEl =
+                $('#heroDate');
+
+              const calendar =
+                $('#heroCalendar');
+
+              const weekday =
+                $('#heroWeekday');
+
+              if(clock){
+                clock.textContent = time;
+              }
+
+              if(dateEl){
+                dateEl.textContent = date;
+              }
+
+              if(calendar){
+                calendar.textContent = shortDate;
+              }
+
+              if(weekday){
+                weekday.textContent =
+                  new Intl.DateTimeFormat(
+                    dateLocaleFor(lang),
+                    {
+                      weekday:'long'
+                    }
+                  ).format(now);
+              }
+
+              const topClock =
+                $('#clock');
+
+              if(topClock){
+                topClock.textContent = time;
+              }
+            }
+
+            function prepareClockPanel(){
+
+              const hud =
+                document.querySelector('.hud-depth');
+
+              if(!hud){
+                return;
+              }
+
+              const firstValue =
+                hud.querySelector(
+                  'div:first-child b'
+                );
+
+              if(firstValue){
+
+                firstValue.id =
+                  'heroClock';
+
+                firstValue.removeAttribute(
+                  'data-i18n'
+                );
+              }
+
+              hud.classList.add(
+                'v6-final-clock'
+              );
+
+              renderClockDate();
+            }
+
+            function prepareMusicButton(){
+
+              const install =
+                $('#installBtn');
+
+              const music =
+                $('#musicBtn');
+
+              if(!install || !music){
+                return;
+              }
+
+              install.classList.add(
+                'v6-mobile-music'
+              );
+
+              install.setAttribute(
+                'aria-label',
+                'Music'
+              );
+
+              install.title =
+                'Music';
+
+              const label =
+                install.querySelector('b');
+
+              if(label){
+                label.textContent = '♫';
+              }
+
+              const icon =
+                install.querySelector('span');
+
+              if(icon){
+                icon.textContent = '♫';
+              }
+
+              install.addEventListener(
+                'click',
+                function(event){
+
+                  if(
+                    window.matchMedia(
+                      '(max-width: 950px)'
+                    ).matches
+                  ){
+
+                    event.preventDefault();
+
+                    event.stopImmediatePropagation();
+
+                    music.click();
+                  }
+
+                },
+                true
+              );
+            }
+
+            function prepareTouchEffect(){
+
+              document.addEventListener(
+                'pointerdown',
+                function(event){
+
+                  const element =
+                    event.target.closest(
+                      'button,a,.btn,.text-btn'
+                    );
+
+                  if(!element){
+                    return;
+                  }
+
+                  element.classList.remove(
+                    'v6-touch-red'
+                  );
+
+                  void element.offsetWidth;
+
+                  element.classList.add(
+                    'v6-touch-red'
+                  );
+
+                  window.setTimeout(
+                    function(){
+                      element.classList.remove(
+                        'v6-touch-red'
+                      );
+                    },
+                    180
+                  );
+
+                },
+                {passive:true}
+              );
+            }
+
+            function start(){
+
+              prepareClockPanel();
+
+              prepareMusicButton();
+
+              prepareTouchEffect();
+
+              renderClockDate();
+
+              window.setInterval(
+                renderClockDate,
+                1000
+              );
+
+              new MutationObserver(
+                function(){
+
+                  prepareClockPanel();
+
+                  renderClockDate();
+
+                }
+              ).observe(
+                document.documentElement,
+                {
+                  attributes:true,
+                  attributeFilter:['lang']
+                }
+              );
+            }
+
+            if(
+              document.readyState ===
+              'loading'
+            ){
+
+              document.addEventListener(
+                'DOMContentLoaded',
+                start,
+                {once:true}
+              );
+
+            }else{
+
+              start();
+
+            }
+
+          })();
+          JS
+
+      - name: Attach Final Patch To V6
+        shell: bash
+        run: |
+          set -e
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          project = Path("${PROJECT}")
+          index = project / "app/src/main/assets/index.html"
+
+          text = index.read_text(encoding="utf-8")
+
+          css = '<link rel="stylesheet" href="css/final-mobile.css">'
+
+          js = '<script src="js/final-mobile.js"></script>'
+
+          if css not in text:
+              text = text.replace(
+                  "</head>",
+                  css + "\n</head>",
+                  1
+              )
+
+          if js not in text:
+              text = text.replace(
+                  "</body>",
+                  js + "\n</body>",
+                  1
+              )
+
+          index.write_text(
+              text,
+              encoding="utf-8"
+          )
+
+          print("FINAL V6 PATCH ATTACHED")
+          PY
+
+          grep -q "final-mobile.css" \
+            "$PROJECT/app/src/main/assets/index.html"
+
+          grep -q "final-mobile.js" \
+            "$PROJECT/app/src/main/assets/index.html"
+
+          test -s \
+            "$PROJECT/app/src/main/assets/css/final-mobile.css"
+
+          test -s \
+            "$PROJECT/app/src/main/assets/js/final-mobile.js"
+
+          echo "PATCH CHECK PASSED"
 
       - name: Verify V6 Assets
         shell: bash
         run: |
           set -e
 
-          echo "Checking Gradle..."
+          echo "Checking V6..."
 
-          gradle --version
+          test -f \
+            "$PROJECT/app/src/main/assets/index.html"
 
-          echo "Checking V6 files..."
+          test -f \
+            "$PROJECT/app/src/main/assets/assets/images/hossein-hero.png"
 
-          test -f "$PROJECT/app/src/main/assets/index.html"
+          test -f \
+            "$PROJECT/app/src/main/assets/assets/audio/ambient.mp3"
 
-          echo "index.html: OK"
+          test -f \
+            "$PROJECT/app/src/main/assets/assets/video/hossein-brand-film.mp4"
 
-          test -f "$PROJECT/app/src/main/assets/assets/audio/ambient.mp3"
+          echo "V6 ASSETS OK"
 
-          echo "ambient.mp3: OK"
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
 
-          test -f "$PROJECT/app/src/main/assets/assets/images/hossein-hero.png"
-
-          echo "hossein-hero.png: OK"
-
-          test -f "$PROJECT/app/src/main/assets/assets/video/hossein-brand-film.mp4"
-
-          echo "hero video: OK"
-
-          echo "===================================="
-          echo "V6 ASSET CHECK PASSED"
-          echo "===================================="
-
-      - name: Build V6 Debug APK
+      - name: Build Final V6 APK
         shell: bash
         run: |
           set -e
@@ -121,7 +946,7 @@ jobs:
           cd "$PROJECT"
 
           echo "===================================="
-          echo "BUILDING HM STUDIO V6"
+          echo "BUILDING FINAL HM STUDIO V6"
           echo "===================================="
 
           gradle :app:assembleDebug \
@@ -134,21 +959,21 @@ jobs:
         run: |
           set -e
 
-          echo "Searching for generated APK..."
-
-          APK=$(find "$PROJECT/app/build/outputs/apk" \
+          APK=$(find \
+            "$PROJECT/app/build/outputs/apk" \
             -type f \
             -name "*.apk" \
             -print \
             | head -n 1)
 
           if [ -z "$APK" ]; then
+
             echo "===================================="
             echo "ERROR: APK NOT GENERATED"
             echo "===================================="
 
-            echo "Build output:"
-            find "$PROJECT/app/build" \
+            find \
+              "$PROJECT/app/build" \
               -maxdepth 8 \
               -type f \
               -print || true
@@ -156,23 +981,21 @@ jobs:
             exit 1
           fi
 
-          echo "APK FOUND:"
-          echo "$APK"
-
           mkdir -p release
 
           cp "$APK" \
-            release/HM-Studio-V6.apk
+            release/HM-Studio-V6-FINAL.apk
 
           echo "===================================="
-          echo "APK READY"
+          echo "FINAL APK READY"
           echo "===================================="
 
-          ls -lh release/HM-Studio-V6.apk
+          ls -lh \
+            release/HM-Studio-V6-FINAL.apk
 
-      - name: Upload APK
+      - name: Upload Final APK
         uses: actions/upload-artifact@v4
         with:
-          name: HM-Studio-V6
-          path: release/HM-Studio-V6.apk
+          name: HM-Studio-V6-FINAL
+          path: release/HM-Studio-V6-FINAL.apk
           if-no-files-found: error
