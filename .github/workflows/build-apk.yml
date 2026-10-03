@@ -1,4 +1,4 @@
-name: HM Studio V6 Final Polish
+name: HM Studio V6 FINAL FIX
 
 on:
   workflow_dispatch:
@@ -15,8 +15,16 @@ jobs:
 
     steps:
 
+      # =========================================================
+      # 1. CHECKOUT
+      # =========================================================
+
       - name: Checkout
         uses: actions/checkout@v4
+
+      # =========================================================
+      # 2. JAVA 17
+      # =========================================================
 
       - name: Java 17
         uses: actions/setup-java@v5
@@ -24,976 +32,1557 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Find and Extract V6
+      # =========================================================
+      # 3. FIND V6 ZIP
+      # =========================================================
+
+      - name: Find V6 ZIP
         shell: bash
         run: |
           set -e
 
-          echo "===================================="
-          echo "FINDING HM STUDIO V6"
-          echo "===================================="
+          echo "======================================"
+          echo "SEARCHING FOR HM STUDIO V6"
+          echo "======================================"
 
-          ZIP=$(find . -type f \
+          ZIP="$(find . \
+            -type f \
             -name 'hm-studio-app-v6-corrected.zip' \
             -print \
-            | head -n 1)
+            | head -n 1)"
 
           if [ -z "$ZIP" ]; then
-            echo "ERROR: V6 ZIP NOT FOUND"
+            echo "ERROR: hm-studio-app-v6-corrected.zip NOT FOUND"
+            echo
+            echo "Available ZIP files:"
             find . -type f -name "*.zip" -print
             exit 1
           fi
 
-          echo "Using:"
+          echo "V6 ZIP FOUND:"
           echo "$ZIP"
+
+          echo "V6_ZIP=$ZIP" >> "$GITHUB_ENV"
+
+      # =========================================================
+      # 4. EXTRACT V6
+      # =========================================================
+
+      - name: Extract V6
+        shell: bash
+        run: |
+          set -e
 
           rm -rf v6
           mkdir -p v6
 
-          unzip -q "$ZIP" -d v6
+          unzip -q "$V6_ZIP" -d v6
 
-          PROJECT=$(find v6 \
+          echo "V6 extracted."
+
+          PROJECT="$(find v6 \
             -type f \
             -name settings.gradle \
             -print \
             | head -n 1 \
-            | xargs -r dirname)
+            | xargs -r dirname)"
 
           if [ -z "$PROJECT" ]; then
-            echo "ERROR: ANDROID PROJECT NOT FOUND"
-            find v6 -maxdepth 5 -type f -print
+            echo "ERROR: Android project was not found."
+            find v6 -maxdepth 6 -type f -print
             exit 1
           fi
 
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
 
-          echo "V6 PROJECT:"
+          echo "======================================"
+          echo "ANDROID PROJECT"
           echo "$PROJECT"
+          echo "======================================"
 
+          test -f "$PROJECT/settings.gradle"
           test -f "$PROJECT/app/build.gradle"
           test -f "$PROJECT/app/src/main/AndroidManifest.xml"
           test -f "$PROJECT/app/src/main/assets/index.html"
 
-          echo "V6 PROJECT OK"
+          echo "PROJECT CHECK PASSED"
 
-      - name: Create Final Mobile CSS
+      # =========================================================
+      # 5. SHOW ORIGINAL INDEX
+      # =========================================================
+
+      - name: Inspect V6
         shell: bash
         run: |
           set -e
 
-          mkdir -p "$PROJECT/app/src/main/assets/css"
-
-          cat > "$PROJECT/app/src/main/assets/css/final-mobile.css" <<'CSS'
-          /* HM STUDIO V6 — FINAL MOBILE POLISH */
-
-          html{
-            -webkit-text-size-adjust:100%;
-          }
-
-          button,a{
-            -webkit-tap-highlight-color:transparent;
-          }
-
-          @media(max-width:950px){
-
-            .header-tools{
-              gap:8px!important;
-              align-items:center!important;
-            }
-
-            /* سه کلید بالای صفحه دقیقاً هم اندازه:
-               تم / آهنگ / منو */
-
-            .header-tools .theme-toggle-btn,
-            .header-tools #installBtn,
-            .header-tools .menu-btn{
-              display:grid!important;
-              place-items:center!important;
-
-              width:46px!important;
-              height:46px!important;
-
-              min-width:46px!important;
-              min-height:46px!important;
-
-              max-width:46px!important;
-              max-height:46px!important;
-
-              flex:0 0 46px!important;
-
-              padding:0!important;
-              margin:0!important;
-
-              border-radius:16px!important;
-            }
-
-            /* دکمه‌های قدیمی جستجو و موسیقی پنهان؛
-               installBtn روی موبایل به دکمه آهنگ تبدیل می‌شود. */
-
-            .header-tools #searchBtn,
-            .header-tools #musicBtn{
-              display:none!important;
-            }
-
-            /* کلید زرد = آهنگ */
-
-            .header-tools #installBtn{
-              background:linear-gradient(
-                145deg,
-                #ffd45a,
-                #e9a928
-              )!important;
-
-              color:#101820!important;
-
-              border:1px solid rgba(
-                255,
-                225,
-                130,
-                .95
-              )!important;
-
-              box-shadow:
-                0 8px 24px
-                rgba(246,196,83,.28)!important;
-            }
-
-            .header-tools #installBtn span{
-              font-size:23px!important;
-              line-height:1!important;
-            }
-
-            .header-tools #installBtn b{
-              display:none!important;
-            }
-
-            .header-tools .theme-toggle-btn{
-              font-size:23px!important;
-              line-height:1!important;
-            }
-
-            .header-tools .menu-btn{
-              font-size:27px!important;
-              line-height:1!important;
-            }
-
-            /* چیدمان پایدار هیرو */
-
-            .hero{
-              padding-top:118px!important;
-              min-height:0!important;
-              display:block!important;
-            }
-
-            .hero-visual{
-              width:100%!important;
-              display:block!important;
-            }
-
-            .scene{
-              width:100%!important;
-              height:590px!important;
-              min-height:590px!important;
-
-              transform:none!important;
-              animation:none!important;
-
-              perspective:none!important;
-              overflow:visible!important;
-            }
-
-            /* حذف لایه‌های سنگین 5D و متن بزرگ
-               فقط در موبایل */
-
-            .scene .glass-console,
-            .scene .screen,
-            .scene .depth-layer,
-            .scene .holo-layer,
-            .scene::before,
-            .scene::after{
-              display:none!important;
-            }
-
-            /* عکس اصلی */
-
-            .hero-photo-wrap{
-              z-index:10!important;
-
-              width:90%!important;
-              height:365px!important;
-
-              right:5%!important;
-              top:0!important;
-
-              transform:none!important;
-            }
-
-            .hero-photo{
-              width:100%!important;
-              height:365px!important;
-
-              object-fit:cover!important;
-              object-position:center top!important;
-
-              border-radius:24px!important;
-
-              mask-image:
-                linear-gradient(
-                  to bottom,
-                  #000 88%,
-                  transparent 100%
-                )!important;
-            }
-
-            .photo-glow{
-              display:none!important;
-            }
-
-            /* گوی آبی ثابت */
-
-            .data-orb{
-              z-index:12!important;
-
-              width:78px!important;
-              height:78px!important;
-
-              right:3%!important;
-              top:250px!important;
-
-              animation:none!important;
-            }
-
-            .data-orb:before,
-            .data-orb:after{
-              display:none!important;
-            }
-
-            /* پنل ثابت ساعت و تاریخ */
-
-            .hud-depth.v6-final-clock{
-              position:absolute!important;
-
-              z-index:30!important;
-
-              top:382px!important;
-
-              left:5%!important;
-              right:5%!important;
-
-              bottom:auto!important;
-
-              width:90%!important;
-              min-width:0!important;
-
-              display:grid!important;
-
-              grid-template-columns:
-                1fr 1fr!important;
-
-              gap:8px!important;
-
-              padding:13px 14px!important;
-
-              margin:0!important;
-
-              transform:none!important;
-
-              border-radius:18px!important;
-
-              border:
-                1px solid
-                rgba(110,210,255,.28)!important;
-
-              background:
-                rgba(3,14,27,.94)!important;
-
-              backdrop-filter:
-                blur(18px)!important;
-
-              -webkit-backdrop-filter:
-                blur(18px)!important;
-
-              box-shadow:
-                0 16px 45px
-                rgba(0,0,0,.34),
-                inset 0 0 24px
-                rgba(66,184,255,.07)!important;
-            }
-
-            .hud-depth.v6-final-clock>div{
-              min-width:0!important;
-              overflow:hidden!important;
-            }
-
-            .hud-depth.v6-final-clock span{
-              display:block!important;
-
-              color:#8fb8cf!important;
-
-              font-size:9px!important;
-
-              line-height:1.3!important;
-
-              letter-spacing:.04em!important;
-
-              white-space:nowrap!important;
-            }
-
-            .hud-depth.v6-final-clock b,
-            .hud-depth.v6-final-clock strong,
-            .hud-depth.v6-final-clock small{
-              font-variant-numeric:
-                tabular-nums!important;
-
-              font-feature-settings:
-                "tnum" 1!important;
-            }
-
-            .hud-depth.v6-final-clock b{
-              display:block!important;
-
-              margin-top:3px!important;
-
-              color:#eaf8ff!important;
-
-              font-size:17px!important;
-
-              line-height:1.35!important;
-
-              white-space:nowrap!important;
-            }
-
-            .hud-depth.v6-final-clock
-            .calendar-live{
-              grid-column:1/-1!important;
-
-              padding-top:8px!important;
-
-              border-top:
-                1px solid
-                rgba(156,231,255,.13)!important;
-            }
-
-            .hud-depth.v6-final-clock
-            .calendar-live strong{
-              display:block!important;
-
-              color:#bdeaff!important;
-
-              font-size:14px!important;
-
-              line-height:1.45!important;
-
-              white-space:nowrap!important;
-
-              overflow:hidden!important;
-
-              text-overflow:ellipsis!important;
-            }
-
-            .hud-depth.v6-final-clock
-            .calendar-live small{
-              display:block!important;
-
-              margin-top:2px!important;
-
-              color:#829caf!important;
-
-              font-size:10px!important;
-            }
-
-            /* امکانات بالای نوار پایین قرار می‌گیرد */
-
-            .command-fab{
-              z-index:10060!important;
-
-              bottom:82px!important;
-
-              inset-inline-end:14px!important;
-
-              min-height:44px!important;
-
-              padding:9px 13px!important;
-
-              border-radius:16px!important;
-
-              background:
-                rgba(5,18,32,.96)!important;
-
-              border:
-                1px solid
-                rgba(66,184,255,.35)!important;
-
-              box-shadow:
-                0 10px 28px
-                rgba(0,0,0,.42)!important;
-            }
-
-            .command-panel{
-              z-index:10061!important;
-
-              bottom:138px!important;
-
-              inset-inline-end:14px!important;
-
-              width:
-                calc(100vw - 28px)!important;
-
-              max-height:
-                calc(100dvh - 190px)!important;
-
-              overflow:auto!important;
-            }
-
-            /* افکت قرمز فقط لحظه لمس */
-
-            .v6-touch-red{
-              animation:
-                v6RedTouch
-                .18s
-                ease-out!important;
-            }
-
-            @keyframes v6RedTouch{
-
-              0%{
-                box-shadow:
-                  0 0 0 0
-                  rgba(255,55,55,0),
-                  0 0 0
-                  rgba(255,55,55,0);
-              }
-
-              45%{
-                box-shadow:
-                  0 0 0 3px
-                  rgba(255,55,55,.38),
-                  0 0 22px
-                  rgba(255,55,55,.32);
-              }
-
-              100%{
-                box-shadow:
-                  0 0 0 0
-                  rgba(255,55,55,0),
-                  0 0 0
-                  rgba(255,55,55,0);
-              }
-            }
-
-            /* ساعت و پنل دیگر رقص و انیمیشن ندارند */
-
-            .hud-depth,
-            .hud-depth *{
-              animation:none!important;
-              transition:none!important;
-            }
-
-            .sky-orb,
-            .orbital-bg,
-            .pulse,
-            .ticker div,
-            .side-float{
-              animation:none!important;
-            }
-          }
-
-          @media(max-width:600px){
-
-            .header{
-              height:68px!important;
-            }
-
-            .header-tools .theme-toggle-btn,
-            .header-tools #installBtn,
-            .header-tools .menu-btn{
-              width:45px!important;
-              height:45px!important;
-
-              min-width:45px!important;
-              min-height:45px!important;
-
-              max-width:45px!important;
-              max-height:45px!important;
-            }
-
-            .scene{
-              height:585px!important;
-              min-height:585px!important;
-            }
-
-            .hero-photo-wrap{
-              height:350px!important;
-            }
-
-            .hero-photo{
-              height:350px!important;
-            }
-
-            .data-orb{
-              top:238px!important;
-
-              width:72px!important;
-              height:72px!important;
-            }
-
-            .hud-depth.v6-final-clock{
-              top:365px!important;
-            }
-
-            .hud-depth.v6-final-clock b{
-              font-size:16px!important;
-            }
-
-            .hud-depth.v6-final-clock
-            .calendar-live strong{
-              font-size:13px!important;
-            }
-          }
-          CSS
-
-      - name: Create Final Mobile JavaScript
+          echo "INDEX:"
+          ls -lh "$PROJECT/app/src/main/assets/index.html"
+
+          echo
+          echo "ASSETS:"
+          find "$PROJECT/app/src/main/assets" \
+            -maxdepth 3 \
+            -type f \
+            | sort \
+            | head -n 250
+
+      # =========================================================
+      # 6. APPLY ONE CLEAN FINAL PATCH
+      # =========================================================
+
+      - name: Apply Final UI Patch
         shell: bash
         run: |
           set -e
 
-          mkdir -p "$PROJECT/app/src/main/assets/js"
+          export HM_PROJECT="$PROJECT"
 
-          cat > "$PROJECT/app/src/main/assets/js/final-mobile.js" <<'JS'
-          (function(){
-
-            'use strict';
-
-            function $(selector){
-              return document.querySelector(selector);
-            }
-
-            function localeFor(lang){
-
-              if(lang === 'fa'){
-                return 'fa-IR';
-              }
-
-              if(lang === 'ar'){
-                return 'ar-EG';
-              }
-
-              return 'en-US';
-            }
-
-            function dateLocaleFor(lang){
-
-              if(lang === 'fa'){
-                return 'fa-IR-u-ca-persian';
-              }
-
-              if(lang === 'ar'){
-                return 'ar-EG-u-ca-gregory';
-              }
-
-              return 'en-US-u-ca-gregory';
-            }
-
-            function renderClockDate(){
-
-              const lang =
-                document.documentElement.lang ||
-                localStorage.getItem('hm-lang') ||
-                'fa';
-
-              const now = new Date();
-
-              const time =
-                new Intl.DateTimeFormat(
-                  localeFor(lang),
-                  {
-                    hour:'2-digit',
-                    minute:'2-digit',
-                    second:'2-digit',
-                    hour12:false
-                  }
-                ).format(now);
-
-              const date =
-                new Intl.DateTimeFormat(
-                  dateLocaleFor(lang),
-                  {
-                    weekday:'long',
-                    day:'numeric',
-                    month:'long',
-                    year:'numeric'
-                  }
-                ).format(now);
-
-              const shortDate =
-                new Intl.DateTimeFormat(
-                  dateLocaleFor(lang),
-                  {
-                    day:'numeric',
-                    month:'long',
-                    year:'numeric'
-                  }
-                ).format(now);
-
-              const clock =
-                $('#heroClock');
-
-              const dateEl =
-                $('#heroDate');
-
-              const calendar =
-                $('#heroCalendar');
-
-              const weekday =
-                $('#heroWeekday');
-
-              if(clock){
-                clock.textContent = time;
-              }
-
-              if(dateEl){
-                dateEl.textContent = date;
-              }
-
-              if(calendar){
-                calendar.textContent = shortDate;
-              }
-
-              if(weekday){
-                weekday.textContent =
-                  new Intl.DateTimeFormat(
-                    dateLocaleFor(lang),
-                    {
-                      weekday:'long'
-                    }
-                  ).format(now);
-              }
-
-              const topClock =
-                $('#clock');
-
-              if(topClock){
-                topClock.textContent = time;
-              }
-            }
-
-            function prepareClockPanel(){
-
-              const hud =
-                document.querySelector('.hud-depth');
-
-              if(!hud){
-                return;
-              }
-
-              const firstValue =
-                hud.querySelector(
-                  'div:first-child b'
-                );
-
-              if(firstValue){
-
-                firstValue.id =
-                  'heroClock';
-
-                firstValue.removeAttribute(
-                  'data-i18n'
-                );
-              }
-
-              hud.classList.add(
-                'v6-final-clock'
-              );
-
-              renderClockDate();
-            }
-
-            function prepareMusicButton(){
-
-              const install =
-                $('#installBtn');
-
-              const music =
-                $('#musicBtn');
-
-              if(!install || !music){
-                return;
-              }
-
-              install.classList.add(
-                'v6-mobile-music'
-              );
-
-              install.setAttribute(
-                'aria-label',
-                'Music'
-              );
-
-              install.title =
-                'Music';
-
-              const label =
-                install.querySelector('b');
-
-              if(label){
-                label.textContent = '♫';
-              }
-
-              const icon =
-                install.querySelector('span');
-
-              if(icon){
-                icon.textContent = '♫';
-              }
-
-              install.addEventListener(
-                'click',
-                function(event){
-
-                  if(
-                    window.matchMedia(
-                      '(max-width: 950px)'
-                    ).matches
-                  ){
-
-                    event.preventDefault();
-
-                    event.stopImmediatePropagation();
-
-                    music.click();
-                  }
-
-                },
-                true
-              );
-            }
-
-            function prepareTouchEffect(){
-
-              document.addEventListener(
-                'pointerdown',
-                function(event){
-
-                  const element =
-                    event.target.closest(
-                      'button,a,.btn,.text-btn'
-                    );
-
-                  if(!element){
-                    return;
-                  }
-
-                  element.classList.remove(
-                    'v6-touch-red'
-                  );
-
-                  void element.offsetWidth;
-
-                  element.classList.add(
-                    'v6-touch-red'
-                  );
-
-                  window.setTimeout(
-                    function(){
-                      element.classList.remove(
-                        'v6-touch-red'
-                      );
-                    },
-                    180
-                  );
-
-                },
-                {passive:true}
-              );
-            }
-
-            function start(){
-
-              prepareClockPanel();
-
-              prepareMusicButton();
-
-              prepareTouchEffect();
-
-              renderClockDate();
-
-              window.setInterval(
-                renderClockDate,
-                1000
-              );
-
-              new MutationObserver(
-                function(){
-
-                  prepareClockPanel();
-
-                  renderClockDate();
-
-                }
-              ).observe(
-                document.documentElement,
-                {
-                  attributes:true,
-                  attributeFilter:['lang']
-                }
-              );
-            }
-
-            if(
-              document.readyState ===
-              'loading'
-            ){
-
-              document.addEventListener(
-                'DOMContentLoaded',
-                start,
-                {once:true}
-              );
-
-            }else{
-
-              start();
-
-            }
-
-          })();
-          JS
-
-      - name: Attach Final Patch To V6
-        shell: bash
-        run: |
-          set -e
-
-          python3 - <<'PY'
+          python3 <<'PY'
+          import os
           from pathlib import Path
 
-          project = Path("${PROJECT}")
+          project = Path(os.environ["HM_PROJECT"])
           index = project / "app/src/main/assets/index.html"
 
-          text = index.read_text(encoding="utf-8")
+          if not index.exists():
+              raise SystemExit("index.html not found")
 
-          css = '<link rel="stylesheet" href="css/final-mobile.css">'
+          html = index.read_text(encoding="utf-8")
 
-          js = '<script src="js/final-mobile.js"></script>'
+          marker = "HM_STUDIO_V6_FINAL_PATCH_2026"
 
-          if css not in text:
-              text = text.replace(
-                  "</head>",
-                  css + "\n</head>",
+          # -----------------------------------------------------
+          # Do not apply the patch twice.
+          # -----------------------------------------------------
+
+          if marker in html:
+              print("Final patch already exists.")
+              raise SystemExit(0)
+
+          patch = r'''
+          <!-- HM_STUDIO_V6_FINAL_PATCH_2026 -->
+
+          <style id="hm-v6-final-style">
+
+          /* ====================================================
+             HM STUDIO V6 FINAL MOBILE UI
+             ==================================================== */
+
+          html,
+          body {
+              overflow-x: hidden !important;
+          }
+
+          body {
+              -webkit-tap-highlight-color: transparent !important;
+          }
+
+          /* ----------------------------------------------------
+             HEADER
+             Three buttons remain equal size.
+             ---------------------------------------------------- */
+
+          @media (max-width: 950px) {
+
+              .header-tools {
+                  display: flex !important;
+                  align-items: center !important;
+                  gap: 8px !important;
+              }
+
+              .header-tools > button,
+              .header-tools > a,
+              .header-tools .theme-toggle-btn,
+              .header-tools #installBtn,
+              .header-tools .menu-btn {
+                  width: 46px !important;
+                  height: 46px !important;
+                  min-width: 46px !important;
+                  min-height: 46px !important;
+                  max-width: 46px !important;
+                  max-height: 46px !important;
+                  flex: 0 0 46px !important;
+                  padding: 0 !important;
+                  margin: 0 !important;
+                  border-radius: 16px !important;
+                  box-sizing: border-box !important;
+              }
+
+              /*
+               * The yellow button is MUSIC.
+               * It is NOT the clock and NOT download.
+               */
+
+              .header-tools #installBtn {
+                  display: grid !important;
+                  place-items: center !important;
+                  background:
+                      linear-gradient(
+                          145deg,
+                          #ffd85c 0%,
+                          #efb62e 100%
+                      ) !important;
+                  color: #08131f !important;
+                  border: 1px solid
+                      rgba(255,255,255,.28) !important;
+                  box-shadow:
+                      0 8px 25px
+                      rgba(238,181,40,.25) !important;
+              }
+
+              .header-tools #installBtn::before {
+                  content: "♫" !important;
+                  display: block !important;
+                  font-size: 27px !important;
+                  line-height: 1 !important;
+                  font-weight: 900 !important;
+              }
+
+              .header-tools #installBtn > * {
+                  display: none !important;
+              }
+
+              .header-tools .theme-toggle-btn {
+                  display: grid !important;
+                  place-items: center !important;
+                  font-size: 23px !important;
+              }
+
+              .header-tools .menu-btn {
+                  display: grid !important;
+                  place-items: center !important;
+                  font-size: 27px !important;
+              }
+
+              /*
+               * Do not touch the working hamburger.
+               */
+
+              .header-tools .menu-btn,
+              .menu-btn,
+              #menuBtn {
+                  z-index: 10050 !important;
+              }
+
+              /* ------------------------------------------------
+                 HERO
+                 ------------------------------------------------ */
+
+              .hero {
+                  position: relative !important;
+                  padding-top: 0 !important;
+              }
+
+              .hero-visual,
+              .scene {
+                  position: relative !important;
+                  overflow: hidden !important;
+              }
+
+              .scene {
+                  height: auto !important;
+                  min-height: 0 !important;
+                  transform: none !important;
+                  animation: none !important;
+                  perspective: none !important;
+              }
+
+              /*
+               * Keep the actual hero image.
+               */
+
+              .hero img,
+              .hero-photo,
+              .hero-photo-wrap img,
+              img[src*="hossein-hero"] {
+                  position: relative !important;
+                  z-index: 5 !important;
+              }
+
+              /*
+               * Remove the giant 5D/depth text and decorative
+               * overlays which were covering the image.
+               */
+
+              .depth-layer,
+              .depth-text,
+              .holo-layer,
+              .hologram,
+              .glass-console,
+              .glass-panel,
+              .hero-depth,
+              .hero-title-bg,
+              .hero-watermark,
+              .five-d,
+              .fiveD,
+              .text-5d,
+              .scene .screen,
+              .scene .console {
+                  display: none !important;
+                  visibility: hidden !important;
+                  opacity: 0 !important;
+              }
+
+              /*
+               * Anything whose text explicitly contains 5D,
+               * عمق, هابعدی, ثلاثي or ثلاثي الأبعاد is decorative
+               * background text and must not cover the photo.
+               */
+
+              .hm-hide-decoration {
+                  display: none !important;
+                  visibility: hidden !important;
+                  opacity: 0 !important;
+              }
+
+              /*
+               * No black glass rectangle.
+               */
+
+              .hm-black-overlay {
+                  display: none !important;
+                  visibility: hidden !important;
+                  opacity: 0 !important;
+              }
+
+              /*
+               * Hero image is clean and stable.
+               */
+
+              .hero-photo-wrap {
+                  z-index: 10 !important;
+                  animation: none !important;
+                  transform: none !important;
+              }
+
+              .hero-photo {
+                  animation: none !important;
+                  transform: none !important;
+              }
+
+              /*
+               * Blue sphere stays, but does not cover content.
+               */
+
+              .data-orb {
+                  z-index: 12 !important;
+                  animation: none !important;
+              }
+
+              /*
+               * -------------------------------------------------
+               * FIXED BEAUTIFUL CLOCK / DATE PANEL
+               * -------------------------------------------------
+               */
+
+              #hm-v6-clock-panel {
+                  position: relative !important;
+
+                  z-index: 40 !important;
+
+                  width: calc(100% - 32px) !important;
+
+                  margin: 14px 16px 12px 16px !important;
+
+                  box-sizing: border-box !important;
+
+                  display: grid !important;
+
+                  grid-template-columns:
+                      1fr 1fr !important;
+
+                  gap: 8px !important;
+
+                  padding: 14px !important;
+
+                  border-radius: 20px !important;
+
+                  background:
+                      linear-gradient(
+                          135deg,
+                          rgba(7,24,42,.97),
+                          rgba(3,13,27,.97)
+                      ) !important;
+
+                  border:
+                      1px solid
+                      rgba(67,194,255,.32) !important;
+
+                  box-shadow:
+                      0 12px 35px
+                      rgba(0,0,0,.30),
+                      inset 0 1px 0
+                      rgba(255,255,255,.05) !important;
+
+                  backdrop-filter:
+                      blur(18px) !important;
+
+                  -webkit-backdrop-filter:
+                      blur(18px) !important;
+
+                  animation: none !important;
+
+                  opacity: 1 !important;
+
+                  visibility: visible !important;
+              }
+
+              #hm-v6-clock-panel .hm-clock-cell {
+                  min-width: 0 !important;
+                  text-align: center !important;
+              }
+
+              #hm-v6-clock-panel .hm-label {
+                  display: block !important;
+                  color: #79a7c3 !important;
+                  font-size: 10px !important;
+                  margin-bottom: 5px !important;
+              }
+
+              #hm-v6-clock-panel .hm-time {
+                  display: block !important;
+                  color: #f2fbff !important;
+                  font-size: 20px !important;
+                  line-height: 1.2 !important;
+                  font-weight: 800 !important;
+                  font-variant-numeric: tabular-nums !important;
+              }
+
+              #hm-v6-clock-panel .hm-date {
+                  grid-column: 1 / -1 !important;
+                  display: block !important;
+                  text-align: center !important;
+                  padding-top: 9px !important;
+                  border-top:
+                      1px solid
+                      rgba(121,200,235,.14) !important;
+                  color: #bcecff !important;
+                  font-size: 13px !important;
+                  line-height: 1.6 !important;
+                  font-weight: 600 !important;
+              }
+
+              /*
+               * -------------------------------------------------
+               * FEATURES BUTTON
+               * -------------------------------------------------
+               */
+
+              #hm-v6-features {
+                  position: relative !important;
+
+                  z-index: 10020 !important;
+
+                  display: flex !important;
+
+                  align-items: center !important;
+
+                  justify-content: center !important;
+
+                  width: calc(100% - 32px) !important;
+
+                  min-height: 48px !important;
+
+                  margin: 8px 16px 92px 16px !important;
+
+                  padding: 10px 16px !important;
+
+                  box-sizing: border-box !important;
+
+                  border-radius: 18px !important;
+
+                  background:
+                      rgba(5,20,35,.96) !important;
+
+                  border:
+                      1px solid
+                      rgba(65,190,245,.30) !important;
+
+                  color: #dff6ff !important;
+
+                  font-size: 15px !important;
+
+                  font-weight: 700 !important;
+
+                  text-decoration: none !important;
+
+                  box-shadow:
+                      0 8px 24px
+                      rgba(0,0,0,.28) !important;
+              }
+
+              /*
+               * Keep bottom navigation above normal page content.
+               * Do not alter its internal structure.
+               */
+
+              .bottom-nav,
+              .bottom-navigation,
+              nav.bottom-nav,
+              .mobile-nav {
+                  z-index: 10000 !important;
+              }
+
+              /*
+               * -------------------------------------------------
+               * TOUCH EFFECT
+               * -------------------------------------------------
+               */
+
+              .hm-red-touch {
+                  animation:
+                      hmRedTouch
+                      .20s
+                      ease-out !important;
+              }
+
+              @keyframes hmRedTouch {
+
+                  0% {
+                      box-shadow:
+                          0 0 0 0
+                          rgba(255,45,45,0),
+                          0 0 0
+                          rgba(255,45,45,0);
+                  }
+
+                  45% {
+                      box-shadow:
+                          0 0 0 3px
+                          rgba(255,55,55,.35),
+                          0 0 20px
+                          rgba(255,55,55,.28);
+                  }
+
+                  100% {
+                      box-shadow:
+                          0 0 0 0
+                          rgba(255,45,45,0),
+                          0 0 0
+                          rgba(255,45,45,0);
+                  }
+              }
+
+              /*
+               * Stop flickering of old HUD elements.
+               */
+
+              .hud-depth,
+              .hud-depth *,
+              .ticker,
+              .ticker *,
+              .side-float,
+              .orbital-bg,
+              .pulse {
+                  animation: none !important;
+              }
+
+          }
+
+          @media (max-width: 600px) {
+
+              .header-tools > button,
+              .header-tools > a,
+              .header-tools .theme-toggle-btn,
+              .header-tools #installBtn,
+              .header-tools .menu-btn {
+                  width: 45px !important;
+                  height: 45px !important;
+                  min-width: 45px !important;
+                  min-height: 45px !important;
+                  max-width: 45px !important;
+                  max-height: 45px !important;
+                  flex-basis: 45px !important;
+              }
+
+              #hm-v6-clock-panel {
+                  margin-left: 12px !important;
+                  margin-right: 12px !important;
+                  width: calc(100% - 24px) !important;
+                  padding: 12px !important;
+              }
+
+              #hm-v6-clock-panel .hm-time {
+                  font-size: 18px !important;
+              }
+
+              #hm-v6-clock-panel .hm-date {
+                  font-size: 12px !important;
+              }
+
+              #hm-v6-features {
+                  width: calc(100% - 24px) !important;
+                  margin-left: 12px !important;
+                  margin-right: 12px !important;
+                  margin-bottom: 92px !important;
+              }
+
+          }
+
+          </style>
+
+          <script id="hm-v6-final-script">
+          (function(){
+
+              "use strict";
+
+              var audio = null;
+              var audioPlaying = false;
+
+              function getLang(){
+
+                  var lang =
+                      document.documentElement.getAttribute("lang");
+
+                  if(!lang){
+                      lang =
+                          localStorage.getItem("hm-lang") ||
+                          localStorage.getItem("language") ||
+                          "fa";
+                  }
+
+                  lang = String(lang).toLowerCase();
+
+                  if(lang.indexOf("ar") === 0){
+                      return "ar";
+                  }
+
+                  if(lang.indexOf("en") === 0){
+                      return "en";
+                  }
+
+                  return "fa";
+              }
+
+              function locale(lang){
+
+                  if(lang === "fa"){
+                      return "fa-IR";
+                  }
+
+                  if(lang === "ar"){
+                      return "ar-EG";
+                  }
+
+                  return "en-US";
+              }
+
+              function dateLocale(lang){
+
+                  if(lang === "fa"){
+                      return "fa-IR-u-ca-persian";
+                  }
+
+                  if(lang === "ar"){
+                      return "ar-EG-u-ca-gregory";
+                  }
+
+                  return "en-US-u-ca-gregory";
+              }
+
+              function nowText(){
+
+                  var lang = getLang();
+
+                  var now = new Date();
+
+                  var time =
+                      new Intl.DateTimeFormat(
+                          locale(lang),
+                          {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                              hour12: false
+                          }
+                      ).format(now);
+
+                  var date =
+                      new Intl.DateTimeFormat(
+                          dateLocale(lang),
+                          {
+                              weekday: "long",
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric"
+                          }
+                      ).format(now);
+
+                  return {
+                      time: time,
+                      date: date
+                  };
+              }
+
+              function createClock(){
+
+                  if(document.getElementById(
+                      "hm-v6-clock-panel"
+                  )){
+                      return;
+                  }
+
+                  var panel =
+                      document.createElement("section");
+
+                  panel.id =
+                      "hm-v6-clock-panel";
+
+                  panel.innerHTML =
+                      '<div class="hm-clock-cell">' +
+                          '<span class="hm-label" ' +
+                          'id="hm-clock-label">زمان</span>' +
+                          '<strong class="hm-time" ' +
+                          'id="hm-v6-time">--:--:--</strong>' +
+                      '</div>' +
+
+                      '<div class="hm-clock-cell">' +
+                          '<span class="hm-label" ' +
+                          'id="hm-date-label">تاریخ</span>' +
+                          '<strong class="hm-time" ' +
+                          'id="hm-v6-weekday">---</strong>' +
+                      '</div>' +
+
+                      '<div class="hm-date" ' +
+                      'id="hm-v6-date">' +
+                          '---' +
+                      '</div>';
+
+                  /*
+                   * Put the clock immediately after hero,
+                   * not at the bottom of body.
+                   */
+
+                  var hero =
+                      document.querySelector(".hero");
+
+                  if(hero && hero.parentNode){
+
+                      hero.parentNode.insertBefore(
+                          panel,
+                          hero.nextSibling
+                      );
+
+                  }else{
+
+                      document.body.appendChild(panel);
+
+                  }
+              }
+
+              function updateClock(){
+
+                  var data = nowText();
+
+                  var time =
+                      document.getElementById(
+                          "hm-v6-time"
+                      );
+
+                  var date =
+                      document.getElementById(
+                          "hm-v6-date"
+                      );
+
+                  var weekday =
+                      document.getElementById(
+                          "hm-v6-weekday"
+                      );
+
+                  if(time){
+                      time.textContent =
+                          data.time;
+                  }
+
+                  if(date){
+                      date.textContent =
+                          data.date;
+                  }
+
+                  if(weekday){
+
+                      var lang = getLang();
+
+                      weekday.textContent =
+                          new Intl.DateTimeFormat(
+                              dateLocale(lang),
+                              {
+                                  weekday: "long"
+                              }
+                          ).format(new Date());
+                  }
+
+                  var langNow = getLang();
+
+                  var label =
+                      document.getElementById(
+                          "hm-clock-label"
+                      );
+
+                  var dateLabel =
+                      document.getElementById(
+                          "hm-date-label"
+                      );
+
+                  if(label){
+
+                      label.textContent =
+                          langNow === "fa"
+                              ? "زمان"
+                              : langNow === "ar"
+                                  ? "الوقت"
+                                  : "TIME";
+                  }
+
+                  if(dateLabel){
+
+                      dateLabel.textContent =
+                          langNow === "fa"
+                              ? "روز"
+                              : langNow === "ar"
+                                  ? "اليوم"
+                                  : "DAY";
+                  }
+              }
+
+              function removeBadDecorations(){
+
+                  /*
+                   * Hide elements containing the known giant
+                   * decorative text.
+                   */
+
+                  var all =
+                      document.querySelectorAll(
+                          "body *"
+                      );
+
+                  for(
+                      var i = 0;
+                      i < all.length;
+                      i++
+                  ){
+
+                      var el = all[i];
+
+                      if(
+                          el.id === "hm-v6-clock-panel" ||
+                          el.id === "hm-v6-features"
+                      ){
+                          continue;
+                      }
+
+                      /*
+                       * Never hide actual images,
+                       * buttons, inputs or navigation.
+                       */
+
+                      var tag =
+                          el.tagName.toLowerCase();
+
+                      if(
+                          tag === "img" ||
+                          tag === "video" ||
+                          tag === "canvas" ||
+                          tag === "button" ||
+                          tag === "input" ||
+                          tag === "textarea" ||
+                          tag === "select" ||
+                          tag === "nav" ||
+                          tag === "a"
+                      ){
+                          continue;
+                      }
+
+                      var txt =
+                          (el.textContent || "")
+                          .replace(/\s+/g," ")
+                          .trim();
+
+                      if(!txt){
+                          continue;
+                      }
+
+                      var lower =
+                          txt.toLowerCase();
+
+                      var badText =
+                          lower.indexOf("5d") !== -1 ||
+                          lower.indexOf("عمق هابعدی") !== -1 ||
+                          lower.indexOf("عمق هابعد") !== -1 ||
+                          lower.indexOf("عمق ثلاثي") !== -1 ||
+                          lower.indexOf("ثلاثي الأبعاد") !== -1;
+
+                      if(!badText){
+                          continue;
+                      }
+
+                      /*
+                       * Only hide the element when it is a
+                       * decorative/large text layer.
+                       */
+
+                      var cs =
+                          window.getComputedStyle(el);
+
+                      var rect =
+                          el.getBoundingClientRect();
+
+                      if(
+                          rect.width > 180 ||
+                          rect.height > 40 ||
+                          cs.position === "absolute" ||
+                          cs.position === "fixed"
+                      ){
+
+                          el.classList.add(
+                              "hm-hide-decoration"
+                          );
+                      }
+                  }
+              }
+
+              function removeBlackHeroOverlay(){
+
+                  /*
+                   * Find large dark absolute/fixed rectangles
+                   * over the hero image.
+                   *
+                   * The real image itself is never touched.
+                   */
+
+                  var hero =
+                      document.querySelector(
+                          ".hero"
+                      );
+
+                  if(!hero){
+                      return;
+                  }
+
+                  var heroRect =
+                      hero.getBoundingClientRect();
+
+                  var elements =
+                      hero.querySelectorAll(
+                          "*"
+                      );
+
+                  for(
+                      var i = 0;
+                      i < elements.length;
+                      i++
+                  ){
+
+                      var el = elements[i];
+
+                      var tag =
+                          el.tagName.toLowerCase();
+
+                      if(
+                          tag === "img" ||
+                          tag === "video" ||
+                          tag === "canvas" ||
+                          tag === "button" ||
+                          tag === "input" ||
+                          tag === "a"
+                      ){
+                          continue;
+                      }
+
+                      var rect =
+                          el.getBoundingClientRect();
+
+                      if(
+                          rect.width < 250 ||
+                          rect.height < 120
+                      ){
+                          continue;
+                      }
+
+                      if(
+                          rect.width >
+                          window.innerWidth * .96
+                      ){
+                          continue;
+                      }
+
+                      var cs =
+                          window.getComputedStyle(el);
+
+                      var bg =
+                          cs.backgroundColor || "";
+
+                      var opacity =
+                          parseFloat(cs.opacity || "1");
+
+                      var dark =
+                          false;
+
+                      var match =
+                          bg.match(
+                              /rgba?\(([^)]+)\)/
+                          );
+
+                      if(match){
+
+                          var parts =
+                              match[1]
+                              .split(",")
+                              .map(function(x){
+                                  return parseFloat(x);
+                              });
+
+                          if(
+                              parts.length >= 3 &&
+                              parts[0] < 30 &&
+                              parts[1] < 40 &&
+                              parts[2] < 55
+                          ){
+                              dark = true;
+                          }
+                      }
+
+                      /*
+                       * Only remove clearly dark,
+                       * positioned, large overlays.
+                       */
+
+                      if(
+                          dark &&
+                          opacity > .35 &&
+                          (
+                              cs.position === "absolute" ||
+                              cs.position === "fixed"
+                          )
+                      ){
+
+                          el.classList.add(
+                              "hm-black-overlay"
+                          );
+                      }
+                  }
+              }
+
+              function createFeatures(){
+
+                  if(document.getElementById(
+                      "hm-v6-features"
+                  )){
+                      return;
+                  }
+
+                  var button =
+                      document.createElement("a");
+
+                  button.id =
+                      "hm-v6-features";
+
+                  button.href = "#";
+
+                  button.innerHTML =
+                      "⚡ &nbsp; امکانات";
+
+                  button.addEventListener(
+                      "click",
+                      function(e){
+
+                          e.preventDefault();
+
+                          /*
+                           * Try the original feature/command
+                           * control without modifying navigation.
+                           */
+
+                          var candidates =
+                              document.querySelectorAll(
+                                  "[data-section], " +
+                                  "[data-page], " +
+                                  ".feature-btn, " +
+                                  ".features-btn, " +
+                                  "#featuresBtn, " +
+                                  "#features"
+                              );
+
+                          for(
+                              var i = 0;
+                              i < candidates.length;
+                              i++
+                          ){
+
+                              var el =
+                                  candidates[i];
+
+                              if(
+                                  el !== button &&
+                                  el.offsetParent !== null
+                              ){
+
+                                  el.click();
+
+                                  return;
+                              }
+                          }
+
+                      }
+                  );
+
+                  /*
+                   * Insert before bottom navigation.
+                   */
+
+                  var nav =
+                      document.querySelector(
+                          ".bottom-nav, " +
+                          ".bottom-navigation, " +
+                          "nav.bottom-nav, " +
+                          ".mobile-nav"
+                      );
+
+                  if(nav && nav.parentNode){
+
+                      nav.parentNode.insertBefore(
+                          button,
+                          nav
+                      );
+
+                  }else{
+
+                      document.body.appendChild(
+                          button
+                      );
+                  }
+              }
+
+              function prepareMusic(){
+
+                  var button =
+                      document.getElementById(
+                          "installBtn"
+                      );
+
+                  if(!button){
+                      return;
+                  }
+
+                  /*
+                   * Remove download meaning.
+                   */
+
+                  button.removeAttribute(
+                      "download"
+                  );
+
+                  button.removeAttribute(
+                      "href"
+                  );
+
+                  button.setAttribute(
+                      "aria-label",
+                      "Music"
+                  );
+
+                  button.setAttribute(
+                      "title",
+                      "Music"
+                  );
+
+                  /*
+                   * Clear old visual content.
+                   */
+
+                  button.innerHTML = "";
+
+                  var icon =
+                      document.createElement(
+                          "span"
+                      );
+
+                  icon.textContent = "♫";
+
+                  icon.style.cssText =
+                      "font-size:27px;" +
+                      "font-weight:900;" +
+                      "line-height:1;";
+
+                  button.appendChild(icon);
+
+                  /*
+                   * Use existing music button if present.
+                   */
+
+                  var existing =
+                      document.getElementById(
+                          "musicBtn"
+                      );
+
+                  button.addEventListener(
+                      "click",
+                      function(e){
+
+                          if(
+                              window.innerWidth >
+                              950
+                          ){
+                              return;
+                          }
+
+                          e.preventDefault();
+                          e.stopPropagation();
+
+                          if(existing){
+
+                              existing.click();
+
+                              return;
+                          }
+
+                          toggleAudio();
+                      },
+                      true
+                  );
+              }
+
+              function toggleAudio(){
+
+                  if(!audio){
+
+                      audio =
+                          new Audio(
+                              "assets/audio/ambient.mp3"
+                          );
+
+                      audio.loop = true;
+
+                      audio.volume = .45;
+                  }
+
+                  if(audioPlaying){
+
+                      audio.pause();
+
+                      audioPlaying = false;
+
+                  }else{
+
+                      audio.play()
+                          .then(function(){
+
+                              audioPlaying = true;
+
+                          })
+                          .catch(function(){
+
+                              /*
+                               * Android may require the next
+                               * user interaction before audio.
+                               */
+
+                              audioPlaying = false;
+
+                          });
+                  }
+              }
+
+              function touchEffect(){
+
+                  document.addEventListener(
+                      "pointerdown",
+                      function(e){
+
+                          var el =
+                              e.target.closest(
+                                  "button, a"
+                              );
+
+                          if(!el){
+                              return;
+                          }
+
+                          el.classList.remove(
+                              "hm-red-touch"
+                          );
+
+                          void el.offsetWidth;
+
+                          el.classList.add(
+                              "hm-red-touch"
+                          );
+
+                          setTimeout(
+                              function(){
+
+                                  el.classList.remove(
+                                      "hm-red-touch"
+                                  );
+
+                              },
+                              220
+                          );
+
+                      },
+                      {
+                          passive: true
+                      }
+                  );
+              }
+
+              function start(){
+
+                  createClock();
+
+                  createFeatures();
+
+                  prepareMusic();
+
+                  removeBadDecorations();
+
+                  removeBlackHeroOverlay();
+
+                  touchEffect();
+
+                  updateClock();
+
+                  setInterval(
+                      updateClock,
+                      1000
+                  );
+
+                  /*
+                   * Language changes in the existing V6 app
+                   * are detected without touching the menu.
+                   */
+
+                  var observer =
+                      new MutationObserver(
+                          function(){
+
+                              updateClock();
+
+                              removeBadDecorations();
+
+                          }
+                      );
+
+                  observer.observe(
+                      document.documentElement,
+                      {
+                          attributes: true,
+                          attributeFilter: [
+                              "lang",
+                              "dir"
+                          ]
+                      }
+                  );
+
+                  /*
+                   * Re-run only the visual cleanup after
+                   * V6 changes its language/content.
+                   */
+
+                  setTimeout(
+                      function(){
+                          removeBadDecorations();
+                          removeBlackHeroOverlay();
+                      },
+                      700
+                  );
+
+                  setTimeout(
+                      function(){
+                          removeBadDecorations();
+                          removeBlackHeroOverlay();
+                      },
+                      1800
+                  );
+              }
+
+              if(
+                  document.readyState ===
+                  "loading"
+              ){
+
+                  document.addEventListener(
+                      "DOMContentLoaded",
+                      start,
+                      {
+                          once: true
+                      }
+                  );
+
+              }else{
+
+                  start();
+
+              }
+
+          })();
+          </script>
+
+          <!-- END HM_STUDIO_V6_FINAL_PATCH_2026 -->
+          '''
+
+          # Insert before </body>.
+          close = "</body>"
+
+          if close in html:
+              html = html.replace(
+                  close,
+                  patch + "\n" + close,
                   1
               )
-
-          if js not in text:
-              text = text.replace(
-                  "</body>",
-                  js + "\n</body>",
-                  1
-              )
+          else:
+              html += "\n" + patch
 
           index.write_text(
-              text,
+              html,
               encoding="utf-8"
           )
 
-          print("FINAL V6 PATCH ATTACHED")
+          print("======================================")
+          print("FINAL PATCH APPLIED")
+          print("======================================")
+          print(index)
+
           PY
 
-          grep -q "final-mobile.css" \
+          echo
+          echo "Checking final patch..."
+
+          grep -q \
+            "HM_STUDIO_V6_FINAL_PATCH_2026" \
             "$PROJECT/app/src/main/assets/index.html"
 
-          grep -q "final-mobile.js" \
+          grep -q \
+            "hm-v6-clock-panel" \
             "$PROJECT/app/src/main/assets/index.html"
 
-          test -s \
-            "$PROJECT/app/src/main/assets/css/final-mobile.css"
-
-          test -s \
-            "$PROJECT/app/src/main/assets/js/final-mobile.js"
+          grep -q \
+            "hm-v6-final-script" \
+            "$PROJECT/app/src/main/assets/index.html"
 
           echo "PATCH CHECK PASSED"
 
-      - name: Verify V6 Assets
+      # =========================================================
+      # 7. VERIFY REQUIRED ASSETS
+      # =========================================================
+
+      - name: Verify Assets
         shell: bash
         run: |
           set -e
 
-          echo "Checking V6..."
+          echo "Checking required assets..."
 
           test -f \
             "$PROJECT/app/src/main/assets/index.html"
-
-          test -f \
-            "$PROJECT/app/src/main/assets/assets/images/hossein-hero.png"
 
           test -f \
             "$PROJECT/app/src/main/assets/assets/audio/ambient.mp3"
 
           test -f \
+            "$PROJECT/app/src/main/assets/assets/images/hossein-hero.png"
+
+          test -f \
             "$PROJECT/app/src/main/assets/assets/video/hossein-brand-film.mp4"
 
-          echo "V6 ASSETS OK"
+          echo
+          echo "======================================"
+          echo "ALL V6 ASSETS OK"
+          echo "======================================"
+
+      # =========================================================
+      # 8. GRADLE
+      # =========================================================
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
 
-      - name: Build Final V6 APK
+      # =========================================================
+      # 9. BUILD
+      # =========================================================
+
+      - name: Build Debug APK
         shell: bash
         run: |
           set -e
 
           cd "$PROJECT"
 
-          echo "===================================="
-          echo "BUILDING FINAL HM STUDIO V6"
-          echo "===================================="
+          echo "======================================"
+          echo "BUILDING HM STUDIO V6 FINAL"
+          echo "======================================"
 
           gradle :app:assembleDebug \
             --no-daemon \
             --stacktrace \
             --console=plain
 
+          echo
+          echo "GRADLE BUILD FINISHED"
+
+      # =========================================================
+      # 10. FIND APK
+      # =========================================================
+
       - name: Verify APK
         shell: bash
         run: |
           set -e
 
-          APK=$(find \
-            "$PROJECT/app/build/outputs/apk" \
-            -type f \
-            -name "*.apk" \
-            -print \
-            | head -n 1)
+          echo "Searching for APK..."
+
+          APK="$(
+            find "$PROJECT/app/build/outputs/apk" \
+              -type f \
+              -name "*.apk" \
+              -print \
+              | head -n 1
+          )"
 
           if [ -z "$APK" ]; then
 
-            echo "===================================="
+            echo
+            echo "======================================"
             echo "ERROR: APK NOT GENERATED"
-            echo "===================================="
+            echo "======================================"
 
-            find \
-              "$PROJECT/app/build" \
-              -maxdepth 8 \
+            echo
+            echo "BUILD DIRECTORY:"
+            find "$PROJECT/app/build" \
+              -maxdepth 10 \
               -type f \
               -print || true
 
             exit 1
           fi
 
+          echo
+          echo "APK FOUND:"
+          echo "$APK"
+
           mkdir -p release
 
-          cp "$APK" \
-            release/HM-Studio-V6-FINAL.apk
+          cp \
+            "$APK" \
+            "release/HM-Studio-V6-FINAL.apk"
 
-          echo "===================================="
-          echo "FINAL APK READY"
-          echo "===================================="
+          echo
+          echo "======================================"
+          echo "APK READY"
+          echo "======================================"
 
           ls -lh \
-            release/HM-Studio-V6-FINAL.apk
+            "release/HM-Studio-V6-FINAL.apk"
 
-      - name: Upload Final APK
+      # =========================================================
+      # 11. UPLOAD
+      # =========================================================
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: HM-Studio-V6-FINAL
