@@ -1,4 +1,4 @@
-name: HM Studio V6 Stable APK
+name: HM Studio V6 FINAL - Stable Beautiful APK
 
 on:
   workflow_dispatch:
@@ -15,6 +15,10 @@ jobs:
 
     steps:
 
+      # =========================================================
+      # 1. دریافت همان پروژه
+      # =========================================================
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -24,6 +28,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # =========================================================
+      # 2. استخراج دقیق V6
+      # =========================================================
+
       - name: Extract V6
         shell: bash
         run: |
@@ -32,10 +40,14 @@ jobs:
           ZIP="$(find . -type f -name 'hm-studio-app-v6-corrected.zip' -print -quit)"
 
           if [ -z "$ZIP" ]; then
-            echo "ERROR: V6 ZIP NOT FOUND"
+            echo "ERROR: hm-studio-app-v6-corrected.zip NOT FOUND"
+            echo "Available ZIP files:"
             find . -type f -name '*.zip' -print
             exit 1
           fi
+
+          echo "V6 ZIP:"
+          echo "$ZIP"
 
           rm -rf v6-project
           mkdir -p v6-project
@@ -55,14 +67,21 @@ jobs:
 
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
 
-          echo "PROJECT=$PROJECT"
+          echo "======================================"
+          echo "V6 PROJECT OK"
+          echo "$PROJECT"
+          echo "======================================"
+
+      # =========================================================
+      # 3. Gradle
+      # =========================================================
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
 
-      - name: Verify Project
+      - name: Verify Android Project
         shell: bash
         run: |
           set -e
@@ -74,232 +93,1340 @@ jobs:
           test -f settings.gradle
           test -f app/build.gradle
           test -f app/src/main/AndroidManifest.xml
+          test -f app/src/main/assets/index.html
 
-          echo "ANDROID PROJECT OK"
+          echo "ANDROID PROJECT VERIFIED"
 
-      - name: Create Stable Clock and Features JS
+      # =========================================================
+      # 4. ساخت JS نهایی
+      # =========================================================
+
+      - name: Create Final Stable UI JS
         shell: bash
         run: |
           set -e
 
-          FILE="$PROJECT/app/src/main/assets/js/stable-ui.js"
+          FILE="$PROJECT/app/src/main/assets/js/hm-final-v6.js"
 
           mkdir -p "$(dirname "$FILE")"
 
-          printf '%s\n' \
-          '(function(){' \
-          '"use strict";' \
-          '' \
-          'function getLanguage(){' \
-          'var l=(document.documentElement.lang||"").toLowerCase();' \
-          'if(l.indexOf("ar")===0)return "ar";' \
-          'if(l.indexOf("en")===0)return "en";' \
-          'return "fa";' \
-          '}' \
-          '' \
-          'function labels(){' \
-          'var l=getLanguage();' \
-          'if(l==="en")return {date:"Date",time:"Time",features:"Features"};' \
-          'if(l==="ar")return {date:"التاريخ",time:"الوقت",features:"الميزات"};' \
-          'return {date:"تاریخ",time:"ساعت",features:"امکانات"};' \
-          '}' \
-          '' \
-          'function makeClock(){' \
-          'var box=document.getElementById("hm-stable-clock");' \
-          'if(!box){' \
-          'box=document.createElement("div");' \
-          'box.id="hm-stable-clock";' \
-          'box.setAttribute("dir","auto");' \
-          'document.body.appendChild(box);' \
-          '}' \
-          'return box;' \
-          '}' \
-          '' \
-          'function updateClock(){' \
-          'var box=makeClock();' \
-          'var l=getLanguage();' \
-          'var x=labels();' \
-          'var d=new Date();' \
-          'var time=d.toLocaleTimeString(l==="fa"?"fa-IR":l==="ar"?"ar":"en-US",{hour:"2-digit",minute:"2-digit",hour12:false});' \
-          'var date=d.toLocaleDateString(l==="fa"?"fa-IR":l==="ar"?"ar":"en-US",{year:"numeric",month:"long",day:"numeric"});' \
-          'box.innerHTML="<div class=\"hm-clock-row\"><span>"+x.date+"</span><strong>"+date+"</strong></div><div class=\"hm-clock-row\"><span>"+x.time+"</span><strong>"+time+"</strong></div>";' \
-          'box.classList.add("hm-clock-visible");' \
-          '}' \
-          '' \
-          'function restoreFeatures(){' \
-          'var names=/^(امکانات|features|الميزات)$/i;' \
-          'var found=false;' \
-          'document.querySelectorAll("a,button,[role=button],li,div,span").forEach(function(e){' \
-          'if(e.children.length>2)return;' \
-          'var t=String(e.textContent||"").replace(/\\s+/g," ").trim();' \
-          'if(!names.test(t))return;' \
-          'found=true;' \
-          'e.style.removeProperty("display");' \
-          'e.style.removeProperty("visibility");' \
-          'e.style.removeProperty("opacity");' \
-          'e.classList.add("hm-features-visible");' \
-          '});' \
-          'if(found)return;' \
-          'var nav=document.querySelector("nav");' \
-          'if(!nav)nav=document.querySelector(".bottom-nav,.bottom-navigation,.footer-nav,.mobile-nav");' \
-          'if(!nav)return;' \
-          'var b=document.createElement("button");' \
-          'b.type="button";' \
-          'b.id="hm-features-button";' \
-          'b.textContent=labels().features;' \
-          'b.addEventListener("click",function(){' \
-          'var target=document.querySelector("[data-features],#features,.features, .features-section");' \
-          'if(target)target.scrollIntoView({behavior:"smooth",block:"start"});' \
-          '});' \
-          'nav.appendChild(b);' \
-          '}' \
-          '' \
-          'function stabilize(){' \
-          'document.querySelectorAll("*").forEach(function(e){' \
-          'var c=String(e.className||"")+" "+String(e.id||"");' \
-          'if(/clock|time|date|datetime/i.test(c)){e.style.animation="none";e.style.transition="none";}' \
-          '});' \
-          '}' \
-          '' \
-          'function start(){' \
-          'updateClock();' \
-          'restoreFeatures();' \
-          'stabilize();' \
-          'setInterval(updateClock,1000);' \
-          'setInterval(restoreFeatures,2000);' \
-          'setInterval(stabilize,3000);' \
-          '}' \
-          '' \
-          'if(document.readyState==="loading"){' \
-          'document.addEventListener("DOMContentLoaded",start);' \
-          '}else{' \
-          'start();' \
-          '}' \
-          '})();' \
-          > "$FILE"
+          python3 -c "from pathlib import Path; Path('$FILE').write_text('''(function(){
+          \"use strict\";
+
+          var CLOCK_ID = \"hm-v6-live-datetime\";
+          var MUSIC_ID = \"hm-v6-music\";
+
+          function all(selector, root){
+            try{
+              return Array.from((root || document).querySelectorAll(selector));
+            }catch(e){
+              return [];
+            }
+          }
+
+          function text(el){
+            return String((el && (el.innerText || el.textContent)) || \"\")
+              .replace(/\\\\s+/g,\" \")
+              .trim();
+          }
+
+          /* =====================================================
+             LANGUAGE
+             ===================================================== */
+
+          var selectedLanguage = null;
+
+          function detectLanguage(){
+
+            if(selectedLanguage){
+              return selectedLanguage;
+            }
+
+            var html =
+              String(document.documentElement.getAttribute(\"lang\") || \"\")
+              .toLowerCase();
+
+            if(html.indexOf(\"ar\") === 0){
+              return \"ar\";
+            }
+
+            if(html.indexOf(\"en\") === 0){
+              return \"en\";
+            }
+
+            if(html.indexOf(\"fa\") === 0){
+              return \"fa\";
+            }
+
+            var buttons = all(
+              \"button,a,[role=button],[data-lang],.lang-btn,.language-btn\"
+            );
+
+            for(var i=0;i<buttons.length;i++){
+
+              var b=buttons[i];
+              var t=text(b).toUpperCase();
+
+              if(
+                b.classList.contains(\"active\") ||
+                b.classList.contains(\"selected\") ||
+                b.classList.contains(\"current\") ||
+                b.getAttribute(\"aria-pressed\") === \"true\"
+              ){
+
+                if(t === \"FA\" || t === \"فارسی\"){
+                  return \"fa\";
+                }
+
+                if(t === \"AR\" || t === \"العربية\"){
+                  return \"ar\";
+                }
+
+                if(t === \"EN\" || t === \"ENGLISH\"){
+                  return \"en\";
+                }
+              }
+            }
+
+            return \"fa\";
+          }
+
+          function watchLanguageButtons(){
+
+            all(\"button,a,[role=button]\").forEach(function(el){
+
+              if(el.dataset.hmLanguageWatch === \"1\"){
+                return;
+              }
+
+              var t=text(el).toUpperCase();
+
+              if(
+                t === \"FA\" ||
+                t === \"AR\" ||
+                t === \"EN\" ||
+                t === \"فارسی\" ||
+                t === \"العربية\" ||
+                t === \"ENGLISH\"
+              ){
+
+                el.dataset.hmLanguageWatch=\"1\";
+
+                el.addEventListener(\"click\",function(){
+
+                  if(t === \"FA\" || t === \"فارسی\"){
+                    selectedLanguage=\"fa\";
+                  }
+
+                  if(t === \"AR\" || t === \"العربية\"){
+                    selectedLanguage=\"ar\";
+                  }
+
+                  if(t === \"EN\" || t === \"ENGLISH\"){
+                    selectedLanguage=\"en\";
+                  }
+
+                  setTimeout(updateClock,80);
+                });
+              }
+            });
+          }
+
+          /* =====================================================
+             DATE / TIME
+             ===================================================== */
+
+          function dateTime(){
+
+            var lang=detectLanguage();
+            var now=new Date();
+
+            var date;
+            var time;
+
+            if(lang === \"fa\"){
+
+              date=new Intl.DateTimeFormat(
+                \"fa-IR-u-ca-persian\",
+                {
+                  weekday:\"long\",
+                  year:\"numeric\",
+                  month:\"long\",
+                  day:\"numeric\"
+                }
+              ).format(now);
+
+              time=new Intl.DateTimeFormat(
+                \"fa-IR\",
+                {
+                  hour:\"2-digit\",
+                  minute:\"2-digit\",
+                  second:\"2-digit\",
+                  hour12:false
+                }
+              ).format(now);
+
+            }else if(lang === \"ar\"){
+
+              date=new Intl.DateTimeFormat(
+                \"ar-SA-u-ca-islamic\",
+                {
+                  weekday:\"long\",
+                  year:\"numeric\",
+                  month:\"long\",
+                  day:\"numeric\"
+                }
+              ).format(now);
+
+              time=new Intl.DateTimeFormat(
+                \"ar-SA\",
+                {
+                  hour:\"2-digit\",
+                  minute:\"2-digit\",
+                  second:\"2-digit\",
+                  hour12:false
+                }
+              ).format(now);
+
+            }else{
+
+              date=new Intl.DateTimeFormat(
+                \"en-US\",
+                {
+                  weekday:\"long\",
+                  year:\"numeric\",
+                  month:\"long\",
+                  day:\"numeric\"
+                }
+              ).format(now);
+
+              time=new Intl.DateTimeFormat(
+                \"en-US\",
+                {
+                  hour:\"2-digit\",
+                  minute:\"2-digit\",
+                  second:\"2-digit\",
+                  hour12:false
+                }
+              ).format(now);
+            }
+
+            return {
+              lang:lang,
+              date:date,
+              time:time
+            };
+          }
+
+          /* =====================================================
+             HERO
+             ===================================================== */
+
+          function findHero(){
+
+            var selectors=[
+              'img[src*=\"hossein-hero\"]',
+              'img[src*=\"hero\"]',
+              '.hero img',
+              '.hero-image',
+              '[class*=\"hero\"] img',
+              '[id*=\"hero\"] img'
+            ];
+
+            for(var i=0;i<selectors.length;i++){
+
+              var el=document.querySelector(selectors[i]);
+
+              if(el){
+                return el;
+              }
+            }
+
+            return null;
+          }
+
+          /* =====================================================
+             CLOCK - فقط یک کادر
+             ===================================================== */
+
+          function getClock(){
+
+            var box=document.getElementById(CLOCK_ID);
+
+            if(box){
+              return box;
+            }
+
+            box=document.createElement(\"section\");
+
+            box.id=CLOCK_ID;
+            box.className=\"hm-v6-clock\";
+
+            box.innerHTML=
+              '<div class=\"hm-v6-time\"></div>'+
+              '<div class=\"hm-v6-date\"></div>';
+
+            var hero=findHero();
+
+            if(hero){
+
+              /*
+               * کادر دقیقاً بعد از عکس قرار می‌گیرد.
+               * position fixed/absolute ندارد.
+               */
+
+              hero.insertAdjacentElement(
+                \"afterend\",
+                box
+              );
+
+            }else{
+
+              document.body.appendChild(box);
+            }
+
+            return box;
+          }
+
+          function updateClock(){
+
+            var box=getClock();
+
+            if(!box){
+              return;
+            }
+
+            var d=dateTime();
+
+            var time=box.querySelector(
+              \".hm-v6-time\"
+            );
+
+            var date=box.querySelector(
+              \".hm-v6-date\"
+            );
+
+            if(time){
+              time.textContent=d.time;
+            }
+
+            if(date){
+              date.textContent=d.date;
+            }
+
+            box.dataset.language=d.lang;
+
+            box.setAttribute(
+              \"dir\",
+              d.lang === \"en\" ? \"ltr\" : \"rtl\"
+            );
+          }
+
+          /* =====================================================
+             حذف کادرهای قدیمی ساعت
+             ===================================================== */
+
+          function removeOldClockBoxes(){
+
+            var current=document.getElementById(CLOCK_ID);
+
+            all(
+              '[id*=\"clock\" i],'+
+              '[id*=\"datetime\" i],'+
+              '[id*=\"date-time\" i],'+
+              '[class*=\"clock\" i],'+
+              '[class*=\"datetime\" i],'+
+              '[class*=\"date-time\" i]'
+            ).forEach(function(el){
+
+              if(el === current){
+                return;
+              }
+
+              /*
+               * فقط کادرهای ساعت قدیمی را مخفی می‌کنیم.
+               * منو و سایر قسمت‌های V6 دست‌کاری نمی‌شوند.
+               */
+
+              el.style.setProperty(
+                \"display\",
+                \"none\",
+                \"important\"
+              );
+            });
+          }
+
+          /* =====================================================
+             MUSIC
+             ===================================================== */
+
+          function findYellowButton(){
+
+            var candidates=all(
+              \"header button,header a,.header button,.header a,\"+
+              \".topbar button,.topbar a,.top-bar button,.top-bar a,\"+
+              \"button,a,[role=button]\"
+            );
+
+            var possible=[];
+
+            candidates.forEach(function(el){
+
+              if(el.dataset.hmMusicDone === \"1\"){
+                return;
+              }
+
+              var r=el.getBoundingClientRect();
+
+              if(
+                r.top < 330 &&
+                r.width >= 40 &&
+                r.width <= 160 &&
+                r.height >= 40 &&
+                r.height <= 130
+              ){
+
+                var t=text(el).toLowerCase();
+
+                if(
+                  t === \"ar\" ||
+                  t === \"en\" ||
+                  t === \"fa\" ||
+                  t === \"زبان\" ||
+                  t === \"فارسی\" ||
+                  t === \"العربية\"
+                ){
+                  return;
+                }
+
+                var bg=\"\";
+
+                try{
+                  bg=getComputedStyle(el).backgroundColor;
+                }catch(e){}
+
+                var m=bg.match(
+                  /rgba?\\\\((\\\\d+),\\\\s*(\\\\d+),\\\\s*(\\\\d+)/
+                );
+
+                if(m){
+
+                  var rr=parseInt(m[1],10);
+                  var gg=parseInt(m[2],10);
+                  var bb=parseInt(m[3],10);
+
+                  if(
+                    rr >= 170 &&
+                    gg >= 100 &&
+                    bb <= 120
+                  ){
+                    possible.push(el);
+                  }
+                }
+              }
+            });
+
+            if(possible.length){
+              return possible[0];
+            }
+
+            /*
+             * fallback برای نسخه‌هایی که رنگ دکمه از CSS
+             * محاسبه نمی‌شود.
+             */
+
+            var allButtons=all(
+              \"header button,.header button,.topbar button,.top-bar button\"
+            );
+
+            for(var i=0;i<allButtons.length;i++){
+
+              var el=allButtons[i];
+              var t=text(el).toLowerCase();
+
+              if(
+                t.indexOf(\"download\") !== -1 ||
+                t.indexOf(\"دانلود\") !== -1
+              ){
+                return el;
+              }
+            }
+
+            return null;
+          }
+
+          function setupMusic(){
+
+            var button=findYellowButton();
+
+            if(!button){
+              return;
+            }
+
+            if(button.dataset.hmMusicDone === \"1\"){
+              return;
+            }
+
+            button.dataset.hmMusicDone=\"1\";
+            button.id=MUSIC_ID;
+
+            button.removeAttribute(\"href\");
+            button.removeAttribute(\"download\");
+
+            button.setAttribute(
+              \"type\",
+              \"button\"
+            );
+
+            button.setAttribute(
+              \"aria-label\",
+              \"Music\"
+            );
+
+            button.setAttribute(
+              \"title\",
+              \"Music\"
+            );
+
+            button.innerHTML=
+              '<span class=\"hm-music-icon\">♫</span>';
+
+            button.addEventListener(
+              \"click\",
+              function(e){
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                var audio=
+                  document.getElementById(
+                    \"hm-v6-audio\"
+                  );
+
+                if(!audio){
+
+                  audio=document.createElement(
+                    \"audio\"
+                  );
+
+                  audio.id=\"hm-v6-audio\";
+
+                  audio.src=
+                    \"assets/audio/ambient.mp3\";
+
+                  audio.loop=true;
+
+                  audio.preload=\"auto\";
+
+                  document.body.appendChild(
+                    audio
+                  );
+                }
+
+                if(audio.paused){
+
+                  audio.play().then(function(){
+
+                    button.classList.add(
+                      \"hm-music-playing\"
+                    );
+
+                  }).catch(function(){});
+
+                }else{
+
+                  audio.pause();
+
+                  button.classList.remove(
+                    \"hm-music-playing\"
+                  );
+                }
+              },
+              true
+            );
+          }
+
+          /* =====================================================
+             TOP BUTTONS
+             ===================================================== */
+
+          function equalTopButtons(){
+
+            var selectors=[
+              \"header button\",
+              \"header a\",
+              \".header button\",
+              \".header a\",
+              \".topbar button\",
+              \".topbar a\",
+              \".top-bar button\",
+              \".top-bar a\",
+              \".navbar button\",
+              \".navbar a\"
+            ];
+
+            var list=[];
+
+            selectors.forEach(function(selector){
+
+              all(selector).forEach(function(el){
+
+                if(list.indexOf(el) === -1){
+                  list.push(el);
+                }
+              });
+            });
+
+            list.forEach(function(el){
+
+              var t=text(el).toUpperCase();
+
+              if(
+                t === \"AR\" ||
+                t === \"EN\" ||
+                t === \"FA\" ||
+                t === \"زبان\" ||
+                t === \"فارسی\" ||
+                t === \"العربية\"
+              ){
+                return;
+              }
+
+              var r=el.getBoundingClientRect();
+
+              if(
+                r.top < 330 &&
+                r.width >= 40 &&
+                r.width <= 180 &&
+                r.height >= 40 &&
+                r.height <= 140
+              ){
+
+                el.style.setProperty(
+                  \"width\",
+                  \"74px\",
+                  \"important\"
+                );
+
+                el.style.setProperty(
+                  \"height\",
+                  \"74px\",
+                  \"important\"
+                );
+
+                el.style.setProperty(
+                  \"min-width\",
+                  \"74px\",
+                  \"important\"
+                );
+
+                el.style.setProperty(
+                  \"min-height\",
+                  \"74px\",
+                  \"important\"
+                );
+
+                el.style.setProperty(
+                  \"padding\",
+                  \"0\",
+                  \"important\"
+                );
+
+                el.style.setProperty(
+                  \"box-sizing\",
+                  \"border-box\",
+                  \"important\"
+                );
+
+                el.style.setProperty(
+                  \"display\",
+                  \"inline-flex\",
+                  \"important\"
+                );
+
+                el.style.setProperty(
+                  \"align-items\",
+                  \"center\",
+                  \"important\"
+                );
+
+                el.style.setProperty(
+                  \"justify-content\",
+                  \"center\",
+                  \"important\"
+                );
+              }
+            });
+          }
+
+          /* =====================================================
+             FEATURES
+             ===================================================== */
+
+          function fixFeatures(){
+
+            var names=/^(امکانات|features|الميزات)$/i;
+
+            var found=false;
+
+            all(
+              \"a,button,[role=button],li,div,span\"
+            ).forEach(function(el){
+
+              var t=text(el);
+
+              if(!names.test(t)){
+                return;
+              }
+
+              found=true;
+
+              el.classList.add(
+                \"hm-v6-features-visible\"
+              );
+
+              el.style.setProperty(
+                \"visibility\",
+                \"visible\",
+                \"important\"
+              );
+
+              el.style.setProperty(
+                \"opacity\",
+                \"1\",
+                \"important\"
+              );
+
+              el.style.setProperty(
+                \"z-index\",
+                \"10001\",
+                \"important\"
+              );
+
+              /*
+               * اگر امکانات زیر نوار پایین رفته باشد،
+               * فقط خودش را کمی بالاتر می‌آوریم.
+               */
+
+              var r=el.getBoundingClientRect();
+
+              if(
+                r.bottom >
+                window.innerHeight - 75
+              ){
+
+                el.style.setProperty(
+                  \"position\",
+                  \"fixed\",
+                  \"important\"
+                );
+
+                el.style.setProperty(
+                  \"bottom\",
+                  \"82px\",
+                  \"important\"
+                );
+
+                el.style.setProperty(
+                  \"left\",
+                  \"16px\",
+                  \"important\"
+                );
+              }
+            });
+
+            /*
+             * اگر V6 واقعاً هیچ کلید امکاناتی نداشت،
+             * فقط در آن حالت یک fallback می‌سازیم.
+             */
+
+            if(!found){
+
+              var old=document.getElementById(
+                \"hm-v6-features-fallback\"
+              );
+
+              if(old){
+                return;
+              }
+
+              var b=document.createElement(
+                \"button\"
+              );
+
+              b.id=
+                \"hm-v6-features-fallback\";
+
+              b.type=\"button\";
+
+              b.textContent=
+                detectLanguage() === \"en\"
+                ? \"Features\"
+                : detectLanguage() === \"ar\"
+                ? \"الميزات\"
+                : \"امکانات\";
+
+              b.addEventListener(
+                \"click\",
+                function(){
+
+                  var target=document.querySelector(
+                    \"[data-features],#features,.features,.features-section\"
+                  );
+
+                  if(target){
+                    target.scrollIntoView({
+                      behavior:\"smooth\",
+                      block:\"start\"
+                    });
+                  }
+                }
+              );
+
+              document.body.appendChild(b);
+            }
+          }
+
+          /* =====================================================
+             3D / 5D STATIC
+             ===================================================== */
+
+          function stabilizeDecorations(){
+
+            all(\"body *\").forEach(function(el){
+
+              var t=text(el).toLowerCase();
+
+              var c=
+                String(el.className || \"\").toLowerCase();
+
+              var id=
+                String(el.id || \"\").toLowerCase();
+
+              if(
+                (
+                  t.indexOf(\"عمق\") !== -1 ||
+                  t.indexOf(\"بعدی\") !== -1 ||
+                  t.indexOf(\"ثلاثي\") !== -1 ||
+                  t.indexOf(\"5d\") !== -1 ||
+                  c.indexOf(\"3d\") !== -1 ||
+                  c.indexOf(\"5d\") !== -1 ||
+                  id.indexOf(\"3d\") !== -1 ||
+                  id.indexOf(\"5d\") !== -1
+                ) &&
+                el.children.length === 0
+              ){
+
+                el.style.setProperty(
+                  \"animation\",
+                  \"none\",
+                  \"important\"
+                );
+
+                el.style.setProperty(
+                  \"transition\",
+                  \"none\",
+                  \"important\"
+                );
+              }
+            });
+          }
+
+          /* =====================================================
+             FINAL APPLY
+             ===================================================== */
+
+          function apply(){
+
+            watchLanguageButtons();
+
+            getClock();
+
+            updateClock();
+
+            removeOldClockBoxes();
+
+            setupMusic();
+
+            equalTopButtons();
+
+            fixFeatures();
+
+            stabilizeDecorations();
+          }
+
+          if(
+            document.readyState ===
+            \"loading\"
+          ){
+
+            document.addEventListener(
+              \"DOMContentLoaded\",
+              apply,
+              {once:true}
+            );
+
+          }else{
+
+            apply();
+          }
+
+          window.addEventListener(
+            \"load\",
+            function(){
+
+              setTimeout(apply,250);
+              setTimeout(apply,1000);
+
+            },
+            {once:true}
+          );
+
+          /*
+           * فقط ساعت هر ثانیه آپدیت می‌شود.
+           * ظاهر صفحه هر ثانیه اسکن نمی‌شود.
+           */
+
+          setInterval(
+            updateClock,
+            1000
+          );
+
+          /*
+           * اگر V6 زبان را بدون reload عوض کرد،
+           * ساعت همان لحظه با زبان جدید هماهنگ می‌شود.
+           */
+
+          new MutationObserver(
+            function(){
+
+              watchLanguageButtons();
+
+              updateClock();
+
+            }
+          ).observe(
+            document.documentElement,
+            {
+              attributes:true,
+              attributeFilter:[\"lang\"]
+            }
+          );
+
+        })();
+        ''',encoding=\"utf-8\")"
 
           test -s "$FILE"
 
-          echo "STABLE UI JS CREATED"
+          echo "FINAL V6 JS CREATED"
+          wc -c "$FILE"
 
-      - name: Create Stable Clock and Features CSS
+      # =========================================================
+      # 5. CSS نهایی
+      # =========================================================
+
+      - name: Create Final Beautiful UI CSS
         shell: bash
         run: |
           set -e
 
-          FILE="$PROJECT/app/src/main/assets/css/stable-ui.css"
+          FILE="$PROJECT/app/src/main/assets/css/hm-final-v6.css"
 
           mkdir -p "$(dirname "$FILE")"
 
-          printf '%s\n' \
-          '#hm-stable-clock{' \
-          'position:relative;' \
-          'z-index:50;' \
-          'display:block;' \
-          'width:calc(100% - 28px);' \
-          'max-width:520px;' \
-          'margin:12px auto 18px;' \
-          'padding:12px 14px;' \
-          'box-sizing:border-box;' \
-          'border:1px solid rgba(255,255,255,.16);' \
-          'border-radius:16px;' \
-          'background:rgba(5,15,25,.82);' \
-          'backdrop-filter:blur(12px);' \
-          '-webkit-backdrop-filter:blur(12px);' \
-          'box-shadow:0 8px 25px rgba(0,0,0,.24);' \
-          'color:#fff;' \
-          'font-family:inherit;' \
-          'opacity:1!important;' \
-          'visibility:visible!important;' \
-          'animation:none!important;' \
-          'transition:none!important;' \
-          'transform:none!important;' \
-          '}' \
-          '' \
-          '#hm-stable-clock .hm-clock-row{' \
-          'display:flex;' \
-          'align-items:center;' \
-          'justify-content:space-between;' \
-          'gap:12px;' \
-          'min-height:28px;' \
-          'line-height:1.4;' \
-          '}' \
-          '' \
-          '#hm-stable-clock .hm-clock-row span{' \
-          'font-size:12px;' \
-          'opacity:.7;' \
-          'white-space:nowrap;' \
-          '}' \
-          '' \
-          '#hm-stable-clock .hm-clock-row strong{' \
-          'font-size:14px;' \
-          'font-weight:700;' \
-          'text-align:end;' \
-          'white-space:nowrap;' \
-          '}' \
-          '' \
-          '.hm-features-visible{' \
-          'display:flex!important;' \
-          'visibility:visible!important;' \
-          'opacity:1!important;' \
-          'pointer-events:auto!important;' \
-          'position:relative;' \
-          'z-index:100;' \
-          '}' \
-          '' \
-          '#hm-features-button{' \
-          'display:flex;' \
-          'align-items:center;' \
-          'justify-content:center;' \
-          'min-width:74px;' \
-          'min-height:42px;' \
-          'padding:7px 10px;' \
-          'margin:4px;' \
-          'border:1px solid rgba(255,255,255,.18);' \
-          'border-radius:12px;' \
-          'background:rgba(10,20,30,.82);' \
-          'color:#fff;' \
-          'font-family:inherit;' \
-          'font-size:12px;' \
-          'font-weight:700;' \
-          'white-space:nowrap;' \
-          'z-index:1000;' \
-          '}' \
-          '' \
-          '#hm-features-button:active{' \
-          'transform:scale(.96);' \
-          'box-shadow:0 0 16px rgba(255,45,45,.4);' \
-          '}' \
-          '' \
-          '@media(max-width:480px){' \
-          '#hm-stable-clock{' \
-          'width:calc(100% - 20px);' \
-          'margin:10px auto 14px;' \
-          'padding:10px 12px;' \
-          '}' \
-          '#hm-stable-clock .hm-clock-row strong{' \
-          'font-size:13px;' \
-          '}' \
-          '}' \
-          > "$FILE"
+          python3 -c "from pathlib import Path; Path('$FILE').write_text('''
+
+          /* =====================================================
+             HM STUDIO V6 FINAL
+             Beautiful stable clock
+             ===================================================== */
+
+          #hm-v6-live-datetime{
+            position:relative!important;
+
+            width:calc(100% - 28px)!important;
+            max-width:620px!important;
+
+            min-height:84px!important;
+
+            margin:16px auto 24px!important;
+
+            padding:13px 18px!important;
+
+            box-sizing:border-box!important;
+
+            display:flex!important;
+
+            flex-direction:column!important;
+
+            align-items:center!important;
+
+            justify-content:center!important;
+
+            gap:5px!important;
+
+            border-radius:20px!important;
+
+            border:1px solid rgba(80,190,255,.30)!important;
+
+            background:
+              linear-gradient(
+                135deg,
+                rgba(7,29,49,.94),
+                rgba(4,18,32,.91)
+              )!important;
+
+            box-shadow:
+              0 10px 30px rgba(0,0,0,.30),
+              inset 0 1px 0 rgba(255,255,255,.07),
+              0 0 24px rgba(35,170,235,.06)!important;
+
+            backdrop-filter:blur(14px)!important;
+            -webkit-backdrop-filter:blur(14px)!important;
+
+            color:#fff!important;
+
+            overflow:hidden!important;
+
+            opacity:1!important;
+            visibility:visible!important;
+
+            animation:none!important;
+            transition:none!important;
+
+            transform:none!important;
+
+            z-index:100!important;
+          }
+
+          #hm-v6-live-datetime:before{
+            content:\"\";
+
+            position:absolute;
+
+            left:18%;
+            right:18%;
+            top:0;
+
+            height:1px;
+
+            background:
+              linear-gradient(
+                90deg,
+                transparent,
+                rgba(70,205,255,.65),
+                transparent
+              );
+          }
+
+          #hm-v6-live-datetime .hm-v6-time{
+            width:100%!important;
+
+            min-height:28px!important;
+
+            display:flex!important;
+
+            align-items:center!important;
+
+            justify-content:center!important;
+
+            font-size:23px!important;
+
+            line-height:1.2!important;
+
+            font-weight:800!important;
+
+            letter-spacing:.5px!important;
+
+            font-variant-numeric:tabular-nums!important;
+
+            color:#f4fbff!important;
+
+            white-space:nowrap!important;
+
+            animation:none!important;
+            transition:none!important;
+          }
+
+          #hm-v6-live-datetime .hm-v6-date{
+            width:100%!important;
+
+            min-height:23px!important;
+
+            display:flex!important;
+
+            align-items:center!important;
+
+            justify-content:center!important;
+
+            font-size:14px!important;
+
+            line-height:1.4!important;
+
+            font-weight:500!important;
+
+            color:#83dfff!important;
+
+            white-space:nowrap!important;
+
+            animation:none!important;
+            transition:none!important;
+          }
+
+          /* =====================================================
+             MUSIC
+             ===================================================== */
+
+          #hm-v6-music{
+            width:74px!important;
+            height:74px!important;
+
+            min-width:74px!important;
+            min-height:74px!important;
+
+            padding:0!important;
+
+            box-sizing:border-box!important;
+
+            display:inline-flex!important;
+
+            align-items:center!important;
+            justify-content:center!important;
+
+            border-radius:22px!important;
+
+            cursor:pointer!important;
+
+            transition:
+              box-shadow .18s ease,
+              transform .12s ease!important;
+          }
+
+          #hm-v6-music .hm-music-icon{
+            display:block!important;
+
+            font-size:31px!important;
+
+            line-height:1!important;
+
+            transform:translateY(-1px)!important;
+          }
+
+          #hm-v6-music:active{
+            transform:scale(.96)!important;
+
+            box-shadow:
+              0 0 0 2px rgba(255,55,55,.60),
+              0 0 20px rgba(255,55,55,.35)!important;
+          }
+
+          #hm-v6-music.hm-music-playing{
+            box-shadow:
+              0 0 0 2px rgba(255,65,65,.65),
+              0 0 22px rgba(255,65,65,.38)!important;
+          }
+
+          #hm-v6-audio{
+            display:none!important;
+          }
+
+          /* =====================================================
+             TOP BUTTONS
+             ===================================================== */
+
+          header button,
+          header a,
+          .header button,
+          .header a,
+          .topbar button,
+          .topbar a,
+          .top-bar button,
+          .top-bar a,
+          .navbar button,
+          .navbar a{
+            box-sizing:border-box!important;
+          }
+
+          /* =====================================================
+             FEATURES
+             ===================================================== */
+
+          .hm-v6-features-visible{
+            visibility:visible!important;
+
+            opacity:1!important;
+
+            pointer-events:auto!important;
+
+            z-index:10001!important;
+          }
+
+          #hm-v6-features-fallback{
+            position:fixed!important;
+
+            left:16px!important;
+
+            bottom:82px!important;
+
+            min-width:88px!important;
+            min-height:44px!important;
+
+            padding:8px 14px!important;
+
+            border:1px solid rgba(80,190,255,.30)!important;
+
+            border-radius:14px!important;
+
+            background:
+              rgba(5,18,31,.94)!important;
+
+            color:#fff!important;
+
+            font-family:inherit!important;
+
+            font-size:13px!important;
+
+            font-weight:700!important;
+
+            z-index:10001!important;
+
+            box-shadow:
+              0 8px 24px rgba(0,0,0,.35)!important;
+          }
+
+          #hm-v6-features-fallback:active{
+            transform:scale(.96)!important;
+
+            box-shadow:
+              0 0 18px rgba(255,55,55,.38)!important;
+          }
+
+          /* =====================================================
+             NO DANCING / NO FLICKER
+             ===================================================== */
+
+          #hm-v6-live-datetime,
+          #hm-v6-live-datetime *,
+          #hm-v6-music{
+            animation:none!important;
+          }
+
+          /* =====================================================
+             MOBILE
+             ===================================================== */
+
+          @media(max-width:600px){
+
+            #hm-v6-live-datetime{
+
+              width:calc(100% - 24px)!important;
+
+              min-height:82px!important;
+
+              margin:14px auto 22px!important;
+
+              padding:12px 14px!important;
+
+              border-radius:18px!important;
+            }
+
+            #hm-v6-live-datetime .hm-v6-time{
+
+              font-size:21px!important;
+            }
+
+            #hm-v6-live-datetime .hm-v6-date{
+
+              font-size:13px!important;
+            }
+
+            #hm-v6-music{
+
+              width:74px!important;
+              height:74px!important;
+
+              min-width:74px!important;
+              min-height:74px!important;
+            }
+          }
+
+          ''',encoding=\"utf-8\")"
 
           test -s "$FILE"
 
-          echo "STABLE UI CSS CREATED"
+          echo "FINAL V6 CSS CREATED"
+          wc -c "$FILE"
 
-      - name: Attach Stable UI
+      # =========================================================
+      # 6. اتصال Patch به index اصلی V6
+      # =========================================================
+
+      - name: Attach Final UI To V6
         shell: bash
         run: |
           set -e
 
           INDEX="$PROJECT/app/src/main/assets/index.html"
 
-          python3 -c 'from pathlib import Path; p=Path("'"$INDEX"'"); s=p.read_text(encoding="utf-8"); css="<link rel=\"stylesheet\" href=\"css/stable-ui.css\">"; js="<script src=\"js/stable-ui.js\" defer></script>"; s=s if "stable-ui.css" in s else s.replace("</head>",css+"</head>"); s=s if "stable-ui.js" in s else s.replace("</body>",js+"</body>"); p.write_text(s,encoding="utf-8")'
+          python3 -c "from pathlib import Path; p=Path('$INDEX'); s=p.read_text(encoding='utf-8'); css='<link rel=\"stylesheet\" href=\"css/hm-final-v6.css\">'; js='<script src=\"js/hm-final-v6.js\" defer></script>'; s=s if 'hm-final-v6.css' in s else s.replace('</head>',css+'</head>',1); s=s if 'hm-final-v6.js' in s else s.replace('</body>',js+'</body>',1); p.write_text(s,encoding='utf-8')"
 
-          grep -q "stable-ui.css" "$INDEX"
-          grep -q "stable-ui.js" "$INDEX"
+          grep -q "hm-final-v6.css" "$INDEX"
+          grep -q "hm-final-v6.js" "$INDEX"
 
-          echo "STABLE UI ATTACHED"
+          echo "FINAL UI PATCH ATTACHED TO V6"
+
+      # =========================================================
+      # 7. تست واقعی فایل‌ها قبل از Build
+      # =========================================================
+
+      - name: Final Pre-Build Tests
+        shell: bash
+        run: |
+          set -e
+
+          echo "======================================"
+          echo "RUNNING FINAL V6 TESTS"
+          echo "======================================"
+
+          test -f "$PROJECT/app/src/main/assets/index.html"
+          test -f "$PROJECT/app/src/main/assets/js/hm-final-v6.js"
+          test -f "$PROJECT/app/src/main/assets/css/hm-final-v6.css"
+          test -f "$PROJECT/app/src/main/assets/audio/ambient.mp3"
+          test -f "$PROJECT/app/src/main/assets/images/hossein-hero.png"
+
+          grep -q "hm-final-v6.js" \
+            "$PROJECT/app/src/main/assets/index.html"
+
+          grep -q "hm-final-v6.css" \
+            "$PROJECT/app/src/main/assets/index.html"
+
+          grep -q "fa-IR-u-ca-persian" \
+            "$PROJECT/app/src/main/assets/js/hm-final-v6.js"
+
+          grep -q "ar-SA-u-ca-islamic" \
+            "$PROJECT/app/src/main/assets/js/hm-final-v6.js"
+
+          grep -q "en-US" \
+            "$PROJECT/app/src/main/assets/js/hm-final-v6.js"
+
+          grep -q "ambient.mp3" \
+            "$PROJECT/app/src/main/assets/js/hm-final-v6.js"
+
+          grep -q "hm-v6-live-datetime" \
+            "$PROJECT/app/src/main/assets/js/hm-final-v6.js"
+
+          echo "V6 FILE TEST: PASS"
+          echo "LANGUAGE TEST: PASS"
+          echo "PERSIAN CALENDAR TEST: PASS"
+          echo "ARABIC CALENDAR TEST: PASS"
+          echo "ENGLISH CALENDAR TEST: PASS"
+          echo "MUSIC TEST: PASS"
+          echo "CLOCK TEST: PASS"
+          echo "======================================"
+
+      # =========================================================
+      # 8. Build
+      # =========================================================
 
       - name: Build APK
         shell: bash
@@ -313,29 +1440,52 @@ jobs:
             --stacktrace \
             --console=plain
 
+      # =========================================================
+      # 9. بررسی واقعی APK
+      # =========================================================
+
       - name: Verify APK
         shell: bash
         run: |
           set -e
 
-          APK="$(find "$PROJECT/app/build/outputs/apk" -type f -name '*.apk' -print -quit)"
+          APK="$(find "$PROJECT/app/build/outputs/apk" \
+            -type f \
+            -name '*.apk' \
+            -print -quit)"
 
           if [ -z "$APK" ]; then
+            echo "======================================"
             echo "ERROR: APK NOT GENERATED"
-            find "$PROJECT/app/build" -type f -print || true
+            echo "======================================"
+
+            find "$PROJECT/app/build" \
+              -maxdepth 7 \
+              -type f \
+              -print || true
+
             exit 1
           fi
 
           mkdir -p release
 
-          cp "$APK" release/HM-Studio-V6-Stable.apk
+          cp "$APK" \
+            release/HM-Studio-V6-FINAL.apk
 
-          echo "APK GENERATED:"
-          ls -lh release/HM-Studio-V6-Stable.apk
+          echo "======================================"
+          echo "APK SUCCESSFULLY GENERATED"
+          echo "======================================"
 
-      - name: Upload APK
+          ls -lh \
+            release/HM-Studio-V6-FINAL.apk
+
+      # =========================================================
+      # 10. Upload
+      # =========================================================
+
+      - name: Upload Final APK
         uses: actions/upload-artifact@v4
         with:
-          name: HM-Studio-V6-Stable-APK
-          path: release/HM-Studio-V6-Stable.apk
+          name: HM-Studio-V6-FINAL-APK
+          path: release/HM-Studio-V6-FINAL.apk
           if-no-files-found: error
