@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -28,92 +29,145 @@ jobs:
         run: |
           set -e
 
-          ZIP=$(find . -type f -name 'hm-studio-app-v6-corrected.zip' | head -n 1)
+          echo "Searching for V6 ZIP..."
+
+          ZIP=$(find . -type f \
+            -name 'hm-studio-app-v6-corrected.zip' \
+            | head -n 1)
 
           if [ -z "$ZIP" ]; then
-            echo "V6 ZIP NOT FOUND"
-            find . -type f -name "*.zip"
+            echo "ERROR: V6 ZIP NOT FOUND"
+            echo "Available ZIP files:"
+            find . -type f -name "*.zip" -print
             exit 1
           fi
 
-          echo "Using V6:"
+          echo "V6 ZIP:"
           echo "$ZIP"
 
           rm -rf v6
-          mkdir v6
+          mkdir -p v6
 
           unzip -q "$ZIP" -d v6
 
-          PROJECT=$(find v6 -type f -name settings.gradle | head -n 1 | xargs dirname)
+          echo "Searching Android project..."
+
+          PROJECT=$(find v6 \
+            -type f \
+            -name settings.gradle \
+            -print \
+            | head -n 1 \
+            | xargs -r dirname)
 
           if [ -z "$PROJECT" ]; then
-            echo "ANDROID PROJECT NOT FOUND"
+            echo "ERROR: Android project not found"
+            find v6 -maxdepth 5 -type f | head -n 200
             exit 1
           fi
 
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
 
+          echo "Project:"
+          echo "$PROJECT"
+
+          test -f "$PROJECT/settings.gradle"
           test -f "$PROJECT/app/build.gradle"
           test -f "$PROJECT/app/src/main/AndroidManifest.xml"
           test -f "$PROJECT/app/src/main/assets/index.html"
 
-          echo "V6 PROJECT OK"
+          echo "V6 PROJECT FOUND"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
 
-      - name: Verify V6
+      - name: Verify V6 Assets
         shell: bash
         run: |
           set -e
-
-          cd "$PROJECT"
 
           echo "Checking Gradle..."
+
           gradle --version
 
-          echo "Checking assets..."
-          test -f app/src/main/assets/index.html
-          test -f app/src/main/assets/images/hossein-hero.png
-          test -f app/src/main/assets/audio/ambient.mp3
+          echo "Checking V6 files..."
 
-          echo "V6 CHECK PASSED"
+          test -f "$PROJECT/app/src/main/assets/index.html"
 
-      - name: Build V6 APK
+          echo "index.html: OK"
+
+          test -f "$PROJECT/app/src/main/assets/assets/audio/ambient.mp3"
+
+          echo "ambient.mp3: OK"
+
+          test -f "$PROJECT/app/src/main/assets/assets/images/hossein-hero.png"
+
+          echo "hossein-hero.png: OK"
+
+          test -f "$PROJECT/app/src/main/assets/assets/video/hossein-brand-film.mp4"
+
+          echo "hero video: OK"
+
+          echo "===================================="
+          echo "V6 ASSET CHECK PASSED"
+          echo "===================================="
+
+      - name: Build V6 Debug APK
         shell: bash
         run: |
           set -e
 
           cd "$PROJECT"
+
+          echo "===================================="
+          echo "BUILDING HM STUDIO V6"
+          echo "===================================="
 
           gradle :app:assembleDebug \
             --no-daemon \
             --stacktrace \
             --console=plain
 
-      - name: Find APK
+      - name: Verify APK
         shell: bash
         run: |
           set -e
 
+          echo "Searching for generated APK..."
+
           APK=$(find "$PROJECT/app/build/outputs/apk" \
             -type f \
             -name "*.apk" \
+            -print \
             | head -n 1)
 
           if [ -z "$APK" ]; then
-            echo "APK NOT FOUND"
-            find "$PROJECT/app/build" -type f | head -n 200
+            echo "===================================="
+            echo "ERROR: APK NOT GENERATED"
+            echo "===================================="
+
+            echo "Build output:"
+            find "$PROJECT/app/build" \
+              -maxdepth 8 \
+              -type f \
+              -print || true
+
             exit 1
           fi
 
+          echo "APK FOUND:"
+          echo "$APK"
+
           mkdir -p release
 
-          cp "$APK" release/HM-Studio-V6.apk
+          cp "$APK" \
+            release/HM-Studio-V6.apk
 
-          echo "APK CREATED:"
+          echo "===================================="
+          echo "APK READY"
+          echo "===================================="
+
           ls -lh release/HM-Studio-V6.apk
 
       - name: Upload APK
