@@ -40,7 +40,6 @@ jobs:
 
           rm -rf v6-source
           mkdir -p v6-source
-
           unzip -q "$ZIP_FILE" -d v6-source
 
           SETTINGS="$(find v6-source -type f -name 'settings.gradle' | head -n 1)"
@@ -51,10 +50,9 @@ jobs:
           fi
 
           PROJECT_DIR="$(dirname "$SETTINGS")"
-
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Check V6 assets
+      - name: Check V6 source
         shell: bash
         run: |
           set -e
@@ -62,9 +60,9 @@ jobs:
           test -f "$PROJECT_DIR/app/src/main/assets/index.html"
           test -f "$PROJECT_DIR/app/src/main/assets/js/app.js"
 
-          echo "V6 source is valid"
+          echo "V6 source OK"
 
-      - name: Add isolated bugfix CSS
+      - name: Add bugfix CSS
         shell: bash
         run: |
           set -e
@@ -72,86 +70,76 @@ jobs:
           mkdir -p "$PROJECT_DIR/app/src/main/assets/css"
 
           cat > "$PROJECT_DIR/app/src/main/assets/css/hm-v6-bugfix.css" <<'EOF'
-/* HM Studio V6 isolated bugfix */
+          html,
+          body {
+            overflow-x: hidden !important;
+          }
 
-/* Prevent horizontal overflow */
-html,
-body {
-  overflow-x: hidden !important;
-}
+          .live-clock,
+          #clock {
+            display: inline-flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            animation: none !important;
+            transition: none !important;
+            transform: none !important;
+            white-space: nowrap !important;
+          }
 
-/* Keep the existing live clock visible and stable */
-.live-clock,
-#clock {
-  display: inline-flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  animation: none !important;
-  transition: none !important;
-  transform: none !important;
-  white-space: nowrap !important;
-}
+          #heroClock,
+          #heroDate,
+          #heroCalendar,
+          #heroWeekday {
+            visibility: visible !important;
+            opacity: 1 !important;
+            animation: none !important;
+            transition: none !important;
+            transform: none !important;
+          }
 
-/* Existing hero date/time information */
-#heroClock,
-#heroDate,
-#heroCalendar,
-#heroWeekday {
-  visibility: visible !important;
-  opacity: 1 !important;
-  animation: none !important;
-  transition: none !important;
-  transform: none !important;
-}
+          [data-i18n="depthLabel"] {
+            display: none !important;
+          }
 
-/* Stop only the problematic giant depth label */
-[data-i18n="depthLabel"] {
-  display: none !important;
-}
+          .glass-console strong[data-i18n="depthLabel"] {
+            display: none !important;
+          }
 
-/* Prevent accidental giant text from the depth label */
-.glass-console strong[data-i18n="depthLabel"] {
-  display: none !important;
-}
+          .header-tools .icon-btn,
+          .header-tools .music-btn,
+          .header-tools button {
+            min-width: 44px !important;
+            width: 44px !important;
+            min-height: 44px !important;
+            height: 44px !important;
+            box-sizing: border-box !important;
+          }
 
-/* Keep top action buttons visually consistent */
-.header-tools .icon-btn,
-.header-tools .music-btn,
-.header-tools button {
-  min-width: 44px !important;
-  width: 44px !important;
-  height: 44px !important;
-  min-height: 44px !important;
-  box-sizing: border-box !important;
-}
+          .hm-v6-stable-info {
+            animation: none !important;
+            transition: none !important;
+          }
 
-/* Do not allow the live information block to blink */
-.hm-v6-stable-info {
-  animation: none !important;
-  transition: none !important;
-}
+          .hm-v6-touch {
+            animation: hmV6Touch 140ms ease-out !important;
+          }
 
-/* Short, subtle touch feedback */
-.hm-v6-touch {
-  animation: hmV6Touch 140ms ease-out !important;
-}
+          @keyframes hmV6Touch {
+            0% {
+              filter: brightness(1);
+            }
 
-@keyframes hmV6Touch {
-  0% {
-    filter: brightness(1);
-  }
+            50% {
+              filter: brightness(1.35);
+            }
 
-  50% {
-    filter: brightness(1.35);
-  }
+            100% {
+              filter: brightness(1);
+            }
+          }
+          EOF
 
-  100% {
-    filter: brightness(1);
-  }
-}
-EOF
-
-      - name: Add isolated bugfix JavaScript
+      - name: Add bugfix JavaScript
         shell: bash
         run: |
           set -e
@@ -159,83 +147,87 @@ EOF
           mkdir -p "$PROJECT_DIR/app/src/main/assets/js"
 
           cat > "$PROJECT_DIR/app/src/main/assets/js/hm-v6-bugfix.js" <<'EOF'
-(function () {
-  "use strict";
+          (function () {
+            "use strict";
 
-  function hideDepthLabel() {
-    document
-      .querySelectorAll('[data-i18n="depthLabel"]')
-      .forEach(function (el) {
-        el.style.display = "none";
-      });
-  }
+            function hideDepthLabel() {
+              document
+                .querySelectorAll('[data-i18n="depthLabel"]')
+                .forEach(function (el) {
+                  el.style.display = "none";
+                });
+            }
 
-  function stabilizeExistingClock() {
-    [
-      "#clock",
-      "#heroClock",
-      "#heroDate",
-      "#heroCalendar",
-      "#heroWeekday"
-    ].forEach(function (selector) {
-      document.querySelectorAll(selector).forEach(function (el) {
-        el.classList.add("hm-v6-stable-info");
-      });
-    });
-  }
+            function stabilizeExistingClock() {
+              [
+                "#clock",
+                "#heroClock",
+                "#heroDate",
+                "#heroCalendar",
+                "#heroWeekday"
+              ].forEach(function (selector) {
+                document.querySelectorAll(selector).forEach(function (el) {
+                  el.classList.add("hm-v6-stable-info");
+                });
+              });
+            }
 
-  function addShortTouchFeedback() {
-    document.addEventListener(
-      "pointerdown",
-      function (event) {
-        var target = event.target.closest(
-          "button, .icon-btn, .music-btn, a"
-        );
+            function addShortTouchFeedback() {
+              document.addEventListener(
+                "pointerdown",
+                function (event) {
+                  var target = event.target.closest(
+                    "button, .icon-btn, .music-btn, a"
+                  );
 
-        if (!target) {
-          return;
-        }
+                  if (!target) {
+                    return;
+                  }
 
-        target.classList.remove("hm-v6-touch");
+                  target.classList.remove("hm-v6-touch");
+                  void target.offsetWidth;
+                  target.classList.add("hm-v6-touch");
 
-        void target.offsetWidth;
+                  window.setTimeout(function () {
+                    target.classList.remove("hm-v6-touch");
+                  }, 180);
+                },
+                { passive: true }
+              );
+            }
 
-        target.classList.add("hm-v6-touch");
+            function cleanupOldPatchElements() {
+              var oldClock = document.getElementById("hm-stable-clock");
+              if (oldClock) {
+                oldClock.remove();
+              }
 
-        window.setTimeout(function () {
-          target.classList.remove("hm-v6-touch");
-        }, 180);
-      },
-      { passive: true }
-    );
-  }
+              var oldFeatures =
+                document.getElementById("hm-features-button");
 
-  function cleanupOldPatchElements() {
-    var oldClock = document.getElementById("hm-stable-clock");
-    if (oldClock) {
-      oldClock.remove();
-    }
+              if (oldFeatures) {
+                oldFeatures.remove();
+              }
+            }
 
-    var oldFeatures = document.getElementById("hm-features-button");
-    if (oldFeatures) {
-      oldFeatures.remove();
-    }
-  }
+            function init() {
+              cleanupOldPatchElements();
+              hideDepthLabel();
+              stabilizeExistingClock();
+              addShortTouchFeedback();
+            }
 
-  function init() {
-    cleanupOldPatchElements();
-    hideDepthLabel();
-    stabilizeExistingClock();
-    addShortTouchFeedback();
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init, { once: true });
-  } else {
-    init();
-  }
-})();
-EOF
+            if (document.readyState === "loading") {
+              document.addEventListener(
+                "DOMContentLoaded",
+                init,
+                { once: true }
+              );
+            } else {
+              init();
+            }
+          })();
+          EOF
 
       - name: Attach bugfix files
         shell: bash
@@ -245,27 +237,35 @@ EOF
           INDEX="$PROJECT_DIR/app/src/main/assets/index.html"
 
           python3 - "$INDEX" <<'PY'
-import sys
-from pathlib import Path
+          import sys
+          from pathlib import Path
 
-index = Path(sys.argv[1])
-text = index.read_text(encoding="utf-8")
+          index = Path(sys.argv[1])
+          text = index.read_text(encoding="utf-8")
 
-css_tag = '<link rel="stylesheet" href="css/hm-v6-bugfix.css">'
-js_tag = '<script src="js/hm-v6-bugfix.js"></script>'
+          css_tag = '<link rel="stylesheet" href="css/hm-v6-bugfix.css">'
+          js_tag = '<script src="js/hm-v6-bugfix.js"></script>'
 
-if css_tag not in text:
-    if "</head>" not in text:
-        raise SystemExit("Could not find </head> in index.html")
-    text = text.replace("</head>", css_tag + "\n</head>", 1)
+          if css_tag not in text:
+              if "</head>" not in text:
+                  raise SystemExit("Missing </head>")
+              text = text.replace(
+                  "</head>",
+                  css_tag + "\n</head>",
+                  1
+              )
 
-if js_tag not in text:
-    if "</body>" not in text:
-        raise SystemExit("Could not find </body> in index.html")
-    text = text.replace("</body>", js_tag + "\n</body>", 1)
+          if js_tag not in text:
+              if "</body>" not in text:
+                  raise SystemExit("Missing </body>")
+              text = text.replace(
+                  "</body>",
+                  js_tag + "\n</body>",
+                  1
+              )
 
-index.write_text(text, encoding="utf-8")
-PY
+          index.write_text(text, encoding="utf-8")
+          PY
 
       - name: Build APK
         shell: bash
@@ -273,9 +273,7 @@ PY
           set -e
 
           cd "$PROJECT_DIR"
-
           chmod +x gradlew
-
           ./gradlew --no-daemon --stacktrace assembleDebug
 
       - name: Find APK
