@@ -1,4 +1,4 @@
-name: HM Studio V6 Final Build
+name: HM Studio V6 Final APK
 
 on:
   push:
@@ -9,13 +9,16 @@ on:
 permissions:
   contents: read
 
+env:
+  GRADLE_VERSION: "8.11.1"
+
 jobs:
   build:
     name: Build HM Studio V6 APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Java 17
@@ -23,60 +26,66 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+          cache: gradle
 
-      - name: Find V6 source
+      - name: Setup Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+
+      - name: Find and extract V6 source
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          ZIP_FILE="$(find . -type f -name 'hm-studio-app-v6-corrected.zip' | head -n 1)"
+          echo "Searching for V6 source ZIP..."
+
+          ZIP_FILE="$(find "$GITHUB_WORKSPACE" -type f -name 'hm-studio-app-v6-corrected.zip' | head -n 1)"
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: hm-studio-app-v6-corrected.zip was not found."
-            find . -maxdepth 3 -type f | head -100
+            echo "ERROR: hm-studio-app-v6-corrected.zip not found."
             exit 1
           fi
 
-          echo "V6 ZIP:"
-          echo "$ZIP_FILE"
+          echo "V6 source: $ZIP_FILE"
 
           rm -rf "$GITHUB_WORKSPACE/v6-source"
           mkdir -p "$GITHUB_WORKSPACE/v6-source"
 
           unzip -q "$ZIP_FILE" -d "$GITHUB_WORKSPACE/v6-source"
 
-          SETTINGS="$(find "$GITHUB_WORKSPACE/v6-source" -type f -name 'settings.gradle' | head -n 1)"
+          SETTINGS_FILE="$(find "$GITHUB_WORKSPACE/v6-source" -type f -name 'settings.gradle' | head -n 1)"
 
-          if [ -z "$SETTINGS" ]; then
+          if [ -z "$SETTINGS_FILE" ]; then
             echo "ERROR: settings.gradle not found."
-            find "$GITHUB_WORKSPACE/v6-source" -maxdepth 5 -type f | head -200
             exit 1
           fi
 
-          PROJECT_DIR="$(dirname "$SETTINGS")"
+          PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
           echo "Android project:"
           echo "$PROJECT_DIR"
 
-      - name: Check V6 source
+      - name: Verify V6 Android project
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           test -f "$PROJECT_DIR/settings.gradle"
+          test -f "$PROJECT_DIR/build.gradle"
           test -f "$PROJECT_DIR/app/build.gradle"
           test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+          test -f "$PROJECT_DIR/app/src/main/java/com/hmstudio/app/MainActivity.java"
           test -f "$PROJECT_DIR/app/src/main/assets/index.html"
-          test -f "$PROJECT_DIR/app/src/main/assets/js/app.js"
 
-          echo "V6 source check: OK"
+          echo "Android project verification passed."
 
-      - name: Add isolated bugfix CSS
+      - name: Add V6 bugfix CSS
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           mkdir -p "$PROJECT_DIR/app/src/main/assets/css"
 
@@ -150,10 +159,10 @@ jobs:
           }
           EOF
 
-      - name: Add isolated bugfix JavaScript
+      - name: Add V6 bugfix JavaScript
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           mkdir -p "$PROJECT_DIR/app/src/main/assets/js"
 
@@ -246,7 +255,7 @@ jobs:
       - name: Attach bugfix files
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           INDEX="$PROJECT_DIR/app/src/main/assets/index.html"
 
@@ -281,56 +290,48 @@ jobs:
           index.write_text(text, encoding="utf-8")
           PY
 
-          echo "Bugfix files attached."
-
-      - name: Build APK
+      - name: Build Debug APK
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           cd "$PROJECT_DIR"
 
-          chmod +x gradlew
-
           echo "Gradle version:"
-          ./gradlew --version
+          gradle --version
 
-          echo "Starting Android debug build..."
+          echo "Starting Android build..."
 
-          ./gradlew \
+          gradle :app:assembleDebug \
             --no-daemon \
-            --console=plain \
-            :app:assembleDebug \
-            --stacktrace
+            --stacktrace \
+            --warning-mode all
 
-      - name: Locate APK
+          echo "Build command completed."
+
+      - name: Locate generated APK
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          echo "Searching for generated APK..."
+          echo "Searching for APK..."
 
-          APK="$(find "$GITHUB_WORKSPACE/v6-source" \
+          APK="$(find "$PROJECT_DIR/app/build/outputs" \
             -type f \
             -name '*.apk' \
             -print \
             | head -n 1)"
 
           if [ -z "$APK" ]; then
-            echo "ERROR: No APK was generated."
+            echo "ERROR: APK was not generated."
 
-            echo "Gradle directories:"
-            find "$PROJECT_DIR" \
-              -type d \
-              \( -name build -o -name outputs \) \
-              -print \
-              | head -100
-
-            echo "APK search:"
-            find "$GITHUB_WORKSPACE/v6-source" \
+            echo "Contents of app/build:"
+            find "$PROJECT_DIR/app/build" \
+              -maxdepth 8 \
               -type f \
-              -name '*.apk' \
-              -print
+              -print \
+              2>/dev/null \
+              | sort || true
 
             exit 1
           fi
@@ -338,16 +339,18 @@ jobs:
           echo "APK FOUND:"
           echo "$APK"
 
-          ls -lh "$APK"
+          mkdir -p "$GITHUB_WORKSPACE/apk-output"
 
-          cp "$APK" "$GITHUB_WORKSPACE/HM-Studio-V6-Bugfix.apk"
+          cp "$APK" \
+            "$GITHUB_WORKSPACE/apk-output/HM-Studio-V6-Bugfix.apk"
 
-          echo "Final APK:"
-          ls -lh "$GITHUB_WORKSPACE/HM-Studio-V6-Bugfix.apk"
+          ls -lh \
+            "$GITHUB_WORKSPACE/apk-output/HM-Studio-V6-Bugfix.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: HM-Studio-V6-Bugfix
-          path: HM-Studio-V6-Bugfix.apk
+          path: apk-output/HM-Studio-V6-Bugfix.apk
           if-no-files-found: error
+          retention-days: 14
