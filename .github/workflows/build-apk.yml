@@ -1,511 +1,303 @@
-name: HM Studio V6 Bugfix Build
+name: Build HM Studio V6 APK
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: HM Studio V6 Bugfix
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
-
-      - name: Checkout repository
-        uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Java 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Find original V6 source
+      - name: Find V6 source
         shell: bash
         run: |
           set -e
 
-          ZIP="$(find . \
-            -type f \
-            -name 'hm-studio-app-v6-corrected.zip' \
-            -print -quit)"
+          ZIP_FILE="$(find . -type f -name 'hm-studio-app-v6-corrected.zip' | head -n 1)"
 
-          if [ -z "$ZIP" ]; then
-            echo "ERROR: hm-studio-app-v6-corrected.zip NOT FOUND"
-            echo "ZIP files found:"
-            find . -type f -name "*.zip" -print
+          if [ -z "$ZIP_FILE" ]; then
+            echo "V6 source ZIP not found"
             exit 1
           fi
 
-          echo "Using ORIGINAL V6:"
-          echo "$ZIP"
-
-          echo "V6_ZIP=$ZIP" >> "$GITHUB_ENV"
-
-      - name: Extract original V6
-        shell: bash
-        run: |
-          set -e
+          echo "Using: $ZIP_FILE"
 
           rm -rf v6-source
           mkdir -p v6-source
 
-          unzip -q "$V6_ZIP" -d v6-source
+          unzip -q "$ZIP_FILE" -d v6-source
 
-          PROJECT="$(
-            find v6-source \
-              -type f \
-              -name settings.gradle \
-              -print -quit \
-              | xargs -r dirname
-          )"
+          SETTINGS="$(find v6-source -type f -name 'settings.gradle' | head -n 1)"
 
-          if [ -z "$PROJECT" ]; then
-            echo "ERROR: Android project NOT FOUND"
+          if [ -z "$SETTINGS" ]; then
+            echo "settings.gradle not found"
             exit 1
           fi
 
-          echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
+          PROJECT_DIR="$(dirname "$SETTINGS")"
 
-          echo "Project:"
-          echo "$PROJECT"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-          test -f "$PROJECT/settings.gradle"
-          test -f "$PROJECT/app/build.gradle"
-          test -f "$PROJECT/app/src/main/AndroidManifest.xml"
-          test -f "$PROJECT/app/src/main/assets/index.html"
-
-      - name: Verify original V6 assets
+      - name: Check V6 assets
         shell: bash
         run: |
           set -e
 
-          test -f "$PROJECT/app/src/main/assets/assets/images/hossein-hero.png"
-          test -f "$PROJECT/app/src/main/assets/assets/images/hossein-secondary.png"
-          test -f "$PROJECT/app/src/main/assets/assets/audio/ambient.mp3"
-          test -f "$PROJECT/app/src/main/assets/assets/video/hossein-brand-film.mp4"
+          test -f "$PROJECT_DIR/app/src/main/assets/index.html"
+          test -f "$PROJECT_DIR/app/src/main/assets/js/app.js"
 
-          echo "ORIGINAL V6 ASSETS OK"
+          echo "V6 source is valid"
 
-      # ---------------------------------------------------------
-      # IMPORTANT:
-      # We DO NOT replace app.js.
-      # We DO NOT replace the original mobile-stability.js.
-      # We DO NOT move the hamburger menu.
-      # We DO NOT move bottom navigation.
-      # We DO NOT move hud-depth.
-      # We only add a small isolated final correction layer.
-      # ---------------------------------------------------------
-
-      - name: Create isolated final bugfix CSS
+      - name: Add isolated bugfix CSS
         shell: bash
         run: |
           set -e
 
-          CSS="$PROJECT/app/src/main/assets/css/hm-final-bugfix.css"
+          mkdir -p "$PROJECT_DIR/app/src/main/assets/css"
 
-          cat > "$CSS" <<'CSS'
-/* ==========================================================
-   HM STUDIO V6 - FINAL BUGFIX
-   Only visual stabilization.
-   Original V6 structure remains untouched.
-   ========================================================== */
+          cat > "$PROJECT_DIR/app/src/main/assets/css/hm-v6-bugfix.css" <<'EOF'
+/* HM Studio V6 isolated bugfix */
 
-/* ----------------------------------------------------------
-   1. NEVER move the main V6 scene
-   ---------------------------------------------------------- */
-
-.scene,
-.hero,
-.hero-section,
-.hero-photo-wrap,
-.photo-glow,
-.data-orb,
-.hud-depth,
-.glass-console,
-.depth-layer,
-.holo-layer,
-.screen {
-  animation: none !important;
-}
-
-/* ----------------------------------------------------------
-   2. Remove only the giant depth label.
-      Keep the actual visual depth scene.
-   ---------------------------------------------------------- */
-
-.glass-console strong[data-i18n="depthLabel"],
-.glass-console strong {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  animation: none !important;
-  transform: none !important;
-}
-
-/* ----------------------------------------------------------
-   3. Prevent giant decorative text from creating overflow.
-   ---------------------------------------------------------- */
-
-.glass-console {
-  overflow: hidden !important;
-}
-
-.scene {
+/* Prevent horizontal overflow */
+html,
+body {
   overflow-x: hidden !important;
 }
 
-/* ----------------------------------------------------------
-   4. Stable clock/date.
-      Do NOT reposition the entire HUD.
-      We only make existing clock/date readable.
-   ---------------------------------------------------------- */
+/* Keep the existing live clock visible and stable */
+.live-clock,
+#clock {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+  white-space: nowrap !important;
+}
 
-#clock,
+/* Existing hero date/time information */
 #heroClock,
 #heroDate,
 #heroCalendar,
 #heroWeekday {
+  visibility: visible !important;
+  opacity: 1 !important;
   animation: none !important;
   transition: none !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-
-/* ----------------------------------------------------------
-   5. Header buttons: equal dimensions.
-      Existing IDs are preserved.
-   ---------------------------------------------------------- */
-
-@media (max-width: 950px) {
-
-  .header-tools {
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-  }
-
-  .header-tools .icon-btn,
-  .header-tools #installBtn,
-  .header-tools #musicBtn,
-  .header-tools #themeBtn,
-  .header-tools #themeToggleBtn,
-  .header-tools #menuBtn,
-  .header-tools .theme-toggle-btn {
-    width: 44px !important;
-    height: 44px !important;
-    min-width: 44px !important;
-    min-height: 44px !important;
-    max-width: 44px !important;
-    max-height: 44px !important;
-    box-sizing: border-box !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    border-radius: 13px !important;
-    display: grid !important;
-    place-items: center !important;
-  }
-
-  .header-tools #installBtn span,
-  .header-tools #musicBtn span {
-    font-size: 21px !important;
-    line-height: 1 !important;
-  }
-}
-
-/* ----------------------------------------------------------
-   6. Yellow music button remains a music button.
-      We do not rename it or turn it into a clock.
-   ---------------------------------------------------------- */
-
-#installBtn,
-#musicBtn {
-  transition: box-shadow .12s ease, transform .08s ease !important;
-}
-
-/* ----------------------------------------------------------
-   7. Short red touch feedback.
-   ---------------------------------------------------------- */
-
-button:active,
-a:active,
-.btn:active,
-.glass-card:active {
-  transform: scale(.985) !important;
-  box-shadow:
-    0 0 0 1px rgba(255,45,45,.25),
-    0 0 14px rgba(255,45,45,.16) !important;
-}
-
-/* ----------------------------------------------------------
-   8. Do not alter hamburger/menu positioning.
-   ---------------------------------------------------------- */
-
-#menuBtn {
-  position: revert !important;
-}
-
-/* ----------------------------------------------------------
-   9. Do not alter bottom navigation positioning.
-   ---------------------------------------------------------- */
-
-.bottom-nav,
-.bottom-navigation,
-.mobile-nav,
-.footer-nav,
-nav {
   transform: none !important;
 }
 
-/* ----------------------------------------------------------
-   10. Keep features/command content above accidental clipping,
-       without changing its original position.
-   ---------------------------------------------------------- */
+/* Stop only the problematic giant depth label */
+[data-i18n="depthLabel"] {
+  display: none !important;
+}
 
-#commandPanel,
-#commandFab {
+/* Prevent accidental giant text from the depth label */
+.glass-console strong[data-i18n="depthLabel"] {
+  display: none !important;
+}
+
+/* Keep top action buttons visually consistent */
+.header-tools .icon-btn,
+.header-tools .music-btn,
+.header-tools button {
+  min-width: 44px !important;
+  width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  box-sizing: border-box !important;
+}
+
+/* Do not allow the live information block to blink */
+.hm-v6-stable-info {
   animation: none !important;
+  transition: none !important;
 }
 
-/* ----------------------------------------------------------
-   11. Mobile overflow protection.
-   ---------------------------------------------------------- */
-
-html,
-body {
-  max-width: 100% !important;
-  overflow-x: hidden !important;
+/* Short, subtle touch feedback */
+.hm-v6-touch {
+  animation: hmV6Touch 140ms ease-out !important;
 }
 
-/* ----------------------------------------------------------
-   12. Reduced motion.
-   ---------------------------------------------------------- */
+@keyframes hmV6Touch {
+  0% {
+    filter: brightness(1);
+  }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation: none !important;
-    transition: none !important;
+  50% {
+    filter: brightness(1.35);
+  }
+
+  100% {
+    filter: brightness(1);
   }
 }
-CSS
+EOF
 
-          test -s "$CSS"
-
-          echo "FINAL BUGFIX CSS CREATED"
-
-      - name: Create isolated final bugfix JavaScript
+      - name: Add isolated bugfix JavaScript
         shell: bash
         run: |
           set -e
 
-          JS="$PROJECT/app/src/main/assets/js/hm-final-bugfix.js"
+          mkdir -p "$PROJECT_DIR/app/src/main/assets/js"
 
-          cat > "$JS" <<'JS'
+          cat > "$PROJECT_DIR/app/src/main/assets/js/hm-v6-bugfix.js" <<'EOF'
 (function () {
   "use strict";
 
-  /*
-   * HM Studio V6 final bugfix.
-   *
-   * Important:
-   * - Do NOT replace app.js.
-   * - Do NOT replace mobile-stability.js.
-   * - Do NOT rebuild hamburger/menu.
-   * - Do NOT rebuild bottom navigation.
-   * - Do NOT create a second clock.
-   *
-   * This file only removes accidental visual leftovers.
-   */
+  function hideDepthLabel() {
+    document
+      .querySelectorAll('[data-i18n="depthLabel"]')
+      .forEach(function (el) {
+        el.style.display = "none";
+      });
+  }
 
-  function removeOldPatchArtifacts() {
-    var selectors = [
-      "#hm-stable-clock",
-      "#hm-features-button"
-    ];
-
-    selectors.forEach(function (selector) {
-      document.querySelectorAll(selector).forEach(function (node) {
-        node.remove();
+  function stabilizeExistingClock() {
+    [
+      "#clock",
+      "#heroClock",
+      "#heroDate",
+      "#heroCalendar",
+      "#heroWeekday"
+    ].forEach(function (selector) {
+      document.querySelectorAll(selector).forEach(function (el) {
+        el.classList.add("hm-v6-stable-info");
       });
     });
   }
 
-  function cleanDepthLabel() {
-    document
-      .querySelectorAll(
-        '.glass-console strong[data-i18n="depthLabel"]'
-      )
-      .forEach(function (node) {
-        node.style.opacity = "0";
-        node.style.visibility = "hidden";
-        node.style.animation = "none";
-        node.style.transform = "none";
-      });
-  }
+  function addShortTouchFeedback() {
+    document.addEventListener(
+      "pointerdown",
+      function (event) {
+        var target = event.target.closest(
+          "button, .icon-btn, .music-btn, a"
+        );
 
-  function keepMusicButton() {
-    /*
-     * Preserve the existing V6 music implementation.
-     * Only make sure we never accidentally convert the button
-     * into a clock/date element.
-     */
-
-    var musicCandidates = [
-      "#musicBtn",
-      "#installBtn",
-      ".music-btn"
-    ];
-
-    musicCandidates.forEach(function (selector) {
-      document.querySelectorAll(selector).forEach(function (button) {
-        if (
-          button.id === "clock" ||
-          button.id === "heroClock"
-        ) {
+        if (!target) {
           return;
         }
 
-        button.removeAttribute("data-i18n-clock");
-      });
-    });
+        target.classList.remove("hm-v6-touch");
+
+        void target.offsetWidth;
+
+        target.classList.add("hm-v6-touch");
+
+        window.setTimeout(function () {
+          target.classList.remove("hm-v6-touch");
+        }, 180);
+      },
+      { passive: true }
+    );
   }
 
-  function run() {
-    removeOldPatchArtifacts();
-    cleanDepthLabel();
-    keepMusicButton();
+  function cleanupOldPatchElements() {
+    var oldClock = document.getElementById("hm-stable-clock");
+    if (oldClock) {
+      oldClock.remove();
+    }
+
+    var oldFeatures = document.getElementById("hm-features-button");
+    if (oldFeatures) {
+      oldFeatures.remove();
+    }
+  }
+
+  function init() {
+    cleanupOldPatchElements();
+    hideDepthLabel();
+    stabilizeExistingClock();
+    addShortTouchFeedback();
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener(
-      "DOMContentLoaded",
-      run,
-      { once: true }
-    );
+    document.addEventListener("DOMContentLoaded", init, { once: true });
   } else {
-    run();
+    init();
   }
-
-  /*
-   * One delayed cleanup only.
-   * No continuous DOM scanning.
-   */
-  setTimeout(run, 1200);
-
 })();
-JS
+EOF
 
-          test -s "$JS"
-
-          echo "FINAL BUGFIX JS CREATED"
-
-      - name: Attach final bugfix files
+      - name: Attach bugfix files
         shell: bash
         run: |
           set -e
 
-          INDEX="$PROJECT/app/src/main/assets/index.html"
+          INDEX="$PROJECT_DIR/app/src/main/assets/index.html"
 
           python3 - "$INDEX" <<'PY'
-from pathlib import Path
 import sys
+from pathlib import Path
 
-p = Path(sys.argv[1])
-s = p.read_text(encoding="utf-8")
+index = Path(sys.argv[1])
+text = index.read_text(encoding="utf-8")
 
-css_tag = '<link rel="stylesheet" href="css/hm-final-bugfix.css">'
-js_tag = '<script src="js/hm-final-bugfix.js" defer></script>'
+css_tag = '<link rel="stylesheet" href="css/hm-v6-bugfix.css">'
+js_tag = '<script src="js/hm-v6-bugfix.js"></script>'
 
-if "hm-final-bugfix.css" not in s:
-    s = s.replace("</head>", css_tag + "\n</head>", 1)
+if css_tag not in text:
+    if "</head>" not in text:
+        raise SystemExit("Could not find </head> in index.html")
+    text = text.replace("</head>", css_tag + "\n</head>", 1)
 
-if "hm-final-bugfix.js" not in s:
-    s = s.replace("</body>", js_tag + "\n</body>", 1)
+if js_tag not in text:
+    if "</body>" not in text:
+        raise SystemExit("Could not find </body> in index.html")
+    text = text.replace("</body>", js_tag + "\n</body>", 1)
 
-p.write_text(s, encoding="utf-8")
+index.write_text(text, encoding="utf-8")
 PY
 
-          grep -q "hm-final-bugfix.css" "$INDEX"
-          grep -q "hm-final-bugfix.js" "$INDEX"
-
-          echo "FINAL BUGFIX ATTACHED"
-
-      - name: Verify source was not structurally damaged
+      - name: Build APK
         shell: bash
         run: |
           set -e
 
-          INDEX="$PROJECT/app/src/main/assets/index.html"
+          cd "$PROJECT_DIR"
 
-          test -f "$INDEX"
-          test -f "$PROJECT/app/src/main/assets/js/app.js"
-          test -f "$PROJECT/app/src/main/assets/js/mobile-stability.js"
-          test -f "$PROJECT/app/src/main/assets/css/styles.css"
+          chmod +x gradlew
 
-          test -f "$PROJECT/app/src/main/assets/assets/images/hossein-hero.png"
-          test -f "$PROJECT/app/src/main/assets/assets/audio/ambient.mp3"
-          test -f "$PROJECT/app/src/main/assets/assets/video/hossein-brand-film.mp4"
+          ./gradlew --no-daemon --stacktrace assembleDebug
 
-          echo "Original V6 structure preserved."
-
-      - name: Setup Gradle 8.11.1
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.11.1"
-
-      - name: Build Debug APK
+      - name: Find APK
         shell: bash
         run: |
           set -e
 
-          cd "$PROJECT"
-
-          gradle :app:assembleDebug \
-            --no-daemon \
-            --stacktrace \
-            --console=plain
-
-      - name: Verify APK
-        shell: bash
-        run: |
-          set -e
-
-          APK="$(
-            find "$PROJECT/app/build/outputs/apk" \
-              -type f \
-              -name "*.apk" \
-              -print -quit
-          )"
+          APK="$(find "$PROJECT_DIR/app/build/outputs/apk" -type f -name '*.apk' | head -n 1)"
 
           if [ -z "$APK" ]; then
-            echo "ERROR: APK NOT GENERATED"
-
-            echo "Build output:"
-            find "$PROJECT/app/build" \
-              -maxdepth 10 \
-              -type f \
-              -print || true
-
+            echo "APK was not generated"
             exit 1
           fi
 
-          mkdir -p release
+          echo "APK generated:"
+          ls -lh "$APK"
 
-          cp "$APK" \
-            release/HM-Studio-V6-BUGFIX.apk
-
-          echo "APK GENERATED:"
-          ls -lh release/HM-Studio-V6-BUGFIX.apk
+          cp "$APK" "$GITHUB_WORKSPACE/HM-Studio-V6-Bugfix.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: HM-Studio-V6-BUGFIX
-          path: release/HM-Studio-V6-BUGFIX.apk
+          name: HM-Studio-V6-Bugfix
+          path: HM-Studio-V6-Bugfix.apk
           if-no-files-found: error
