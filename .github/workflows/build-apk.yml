@@ -1,43 +1,45 @@
-      - name: Build APK
-        shell: bash
+name: HM Studio APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Find project
         run: |
-          set -e
+          unzip -q hm-studio-app-v6-corrected.zip -d v6
+          echo "PROJECT=$(find v6 -name settings.gradle -printf '%h\n' | head -1)" >> "$GITHUB_ENV"
 
-          cd "$PROJECT_DIR"
-
+      - name: Build
+        run: |
+          cd "$PROJECT"
           chmod +x gradlew
+          ./gradlew assembleDebug
 
-          ./gradlew --no-daemon --console=plain clean assembleDebug
-
-          echo "Searching for generated APK..."
-          find "$GITHUB_WORKSPACE/v6-source" -type f -name "*.apk" -print
-
-      - name: Find APK
-        shell: bash
+      - name: Collect APK
         run: |
-          set -e
-
-          APK="$(find "$GITHUB_WORKSPACE/v6-source" -type f -name '*.apk' | head -n 1)"
-
-          if [ -z "$APK" ]; then
-            echo "ERROR: No APK was generated."
-            echo "Gradle project:"
-            echo "$PROJECT_DIR"
-            echo ""
-            echo "APK files found:"
-            find "$GITHUB_WORKSPACE/v6-source" -type f -name '*.apk' -print || true
-            exit 1
-          fi
-
-          echo "APK found:"
-          echo "$APK"
-          ls -lh "$APK"
-
-          cp "$APK" "$GITHUB_WORKSPACE/HM-Studio-V6-Bugfix.apk"
+          find . -name "*.apk" -type f
+          APK=$(find . -name "*.apk" -type f | head -1)
+          test -n "$APK"
+          cp "$APK" HM-Studio.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: HM-Studio-V6-Bugfix
-          path: HM-Studio-V6-Bugfix.apk
-          if-no-files-found: error
+          name: HM-Studio-APK
+          path: HM-Studio.apk
