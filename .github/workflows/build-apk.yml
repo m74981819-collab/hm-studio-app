@@ -21,26 +21,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Find and extract V6 source
+      - name: Extract V6 source
         shell: bash
         run: |
           set -euo pipefail
 
           echo "======================================"
-          echo "FINDING V6 SOURCE ZIP"
+          echo "EXTRACTING HM STUDIO V6"
           echo "======================================"
 
           ZIP_FILE="$(find "$GITHUB_WORKSPACE" -type f -name 'hm-studio-app-v6-corrected.zip' -print -quit)"
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: hm-studio-app-v6-corrected.zip was not found."
-            echo "Repository files:"
-            find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -print | sort || true
+            echo "ERROR: hm-studio-app-v6-corrected.zip not found."
             exit 1
           fi
-
-          echo "V6 ZIP:"
-          echo "$ZIP_FILE"
 
           rm -rf "$GITHUB_WORKSPACE/v6-source"
           mkdir -p "$GITHUB_WORKSPACE/v6-source"
@@ -50,8 +45,7 @@ jobs:
           SETTINGS_FILE="$(find "$GITHUB_WORKSPACE/v6-source" -type f -name 'settings.gradle' -print -quit)"
 
           if [ -z "$SETTINGS_FILE" ]; then
-            echo "ERROR: settings.gradle was not found after extraction."
-            find "$GITHUB_WORKSPACE/v6-source" -maxdepth 5 -type f -print | sort || true
+            echo "ERROR: settings.gradle not found."
             exit 1
           fi
 
@@ -59,11 +53,8 @@ jobs:
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-          echo "Android project:"
+          echo "V6 project:"
           echo "$PROJECT_DIR"
-
-          echo "Project files:"
-          find "$PROJECT_DIR" -maxdepth 3 -type f -print | sort | head -200
 
       - name: Setup Java 17
         uses: actions/setup-java@v5
@@ -76,14 +67,10 @@ jobs:
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
 
-      - name: Verify V6 Android project
+      - name: Verify source
         shell: bash
         run: |
           set -euo pipefail
-
-          echo "======================================"
-          echo "VERIFYING ANDROID PROJECT"
-          echo "======================================"
 
           test -f "$PROJECT_DIR/settings.gradle"
           test -f "$PROJECT_DIR/build.gradle"
@@ -91,222 +78,442 @@ jobs:
           test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
           test -f "$PROJECT_DIR/app/src/main/java/com/hmstudio/app/MainActivity.java"
           test -f "$PROJECT_DIR/app/src/main/assets/index.html"
+          test -f "$PROJECT_DIR/app/src/main/assets/css/styles.css"
+          test -f "$PROJECT_DIR/app/src/main/assets/js/app.js"
 
-          echo "Android project verification passed."
+          echo "V6 source verification passed."
 
-      - name: Add V6 bugfix CSS
+      - name: Apply real V6 fixes
         shell: bash
         run: |
           set -euo pipefail
 
-          mkdir -p "$PROJECT_DIR/app/src/main/assets/css"
+          python3 - "$PROJECT_DIR" <<'PY'
+          import sys
+          from pathlib import Path
 
-          cat > "$PROJECT_DIR/app/src/main/assets/css/hm-v6-bugfix.css" <<'EOF'
-          html,
-          body {
-            overflow-x: hidden !important;
-          }
+          project = Path(sys.argv[1])
 
-          .live-clock,
-          #clock {
-            display: inline-flex !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            animation: none !important;
-            transition: none !important;
-            transform: none !important;
-            white-space: nowrap !important;
-          }
+          css_file = project / "app/src/main/assets/css/styles.css"
+          js_file = project / "app/src/main/assets/js/app.js"
+          java_file = project / "app/src/main/java/com/hmstudio/app/MainActivity.java"
 
-          #heroClock,
-          #heroDate,
-          #heroCalendar,
-          #heroWeekday {
-            visibility: visible !important;
-            opacity: 1 !important;
-            animation: none !important;
-            transition: none !important;
-            transform: none !important;
-          }
+          # ============================================================
+          # 1. REAL MOBILE HEADER FIX
+          #
+          # Keep the existing hamburger/menu untouched.
+          # Mobile header becomes:
+          #   [clock] [yellow music] [hamburger]
+          #
+          # The old install button is hidden on mobile because the
+          # Android application is already installed.
+          # ============================================================
 
-          [data-i18n="depthLabel"] {
-            display: none !important;
-          }
+          css = css_file.read_text(encoding="utf-8")
 
+          final_css = r'''
+
+          /* ==========================================================
+             HM STUDIO V6 — FINAL MOBILE HEADER / HERO FIX
+             ========================================================== */
+
+          /* Remove only the giant 5D label.
+             The visual console itself remains intact. */
           .glass-console strong[data-i18n="depthLabel"] {
             display: none !important;
           }
 
-          .header-tools .icon-btn,
-          .header-tools .music-btn,
-          .header-tools button {
-            min-width: 44px !important;
-            width: 44px !important;
-            min-height: 44px !important;
-            height: 44px !important;
-            box-sizing: border-box !important;
-          }
-
-          .hm-v6-stable-info {
+          /* Never animate the live information itself. */
+          #clock,
+          #heroClock,
+          #heroDate,
+          #heroCalendar,
+          #heroWeekday {
             animation: none !important;
             transition: none !important;
+          }
+
+          @media (max-width: 950px) {
+
+            /* ---------------------------------------------
+               HEADER
+               --------------------------------------------- */
+
+            .header-tools {
+              display: flex !important;
+              align-items: center !important;
+              gap: 6px !important;
+              flex: 0 0 auto !important;
+              direction: ltr !important;
+            }
+
+            /* Search and theme remain available through the
+               existing menu/command center, not the top bar. */
+            .header-tools #searchBtn,
+            .header-tools #themeBtn,
+            .header-tools #installBtn {
+              display: none !important;
+            }
+
+            /* LIVE CLOCK — same physical size as the buttons */
+            .header-tools #clock {
+              display: grid !important;
+              place-items: center !important;
+
+              width: 44px !important;
+              height: 44px !important;
+              min-width: 44px !important;
+              min-height: 44px !important;
+              flex: 0 0 44px !important;
+
+              margin: 0 !important;
+              padding: 0 !important;
+
+              box-sizing: border-box !important;
+              border-radius: 10px !important;
+
+              font-family: Inter, sans-serif !important;
+              font-size: 9px !important;
+              font-weight: 700 !important;
+              line-height: 1 !important;
+              letter-spacing: -0.02em !important;
+              font-variant-numeric: tabular-nums !important;
+
+              white-space: nowrap !important;
+
+              visibility: visible !important;
+              opacity: 1 !important;
+
+              animation: none !important;
+              transition: none !important;
+              transform: none !important;
+            }
+
+            /* YELLOW BUTTON = MUSIC.
+               It uses the existing #musicBtn and therefore
+               keeps the real ambient audio handler. */
+            .header-tools #musicBtn {
+              display: grid !important;
+              place-items: center !important;
+
+              width: 44px !important;
+              height: 44px !important;
+              min-width: 44px !important;
+              min-height: 44px !important;
+              flex: 0 0 44px !important;
+
+              margin: 0 !important;
+              padding: 0 !important;
+
+              box-sizing: border-box !important;
+              border-radius: 10px !important;
+
+              background: linear-gradient(
+                145deg,
+                #f7c84a,
+                #e9a928
+              ) !important;
+
+              color: #111827 !important;
+
+              border: 1px solid rgba(255,220,120,.9) !important;
+
+              box-shadow:
+                0 8px 24px rgba(246,196,83,.22) !important;
+
+              font-size: 21px !important;
+              line-height: 1 !important;
+
+              visibility: visible !important;
+              opacity: 1 !important;
+            }
+
+            /* EXISTING HAMBURGER — do not change its behavior */
+            .header-tools #menuBtn {
+              display: grid !important;
+              place-items: center !important;
+
+              width: 44px !important;
+              height: 44px !important;
+              min-width: 44px !important;
+              min-height: 44px !important;
+              flex: 0 0 44px !important;
+
+              margin: 0 !important;
+              padding: 0 !important;
+
+              box-sizing: border-box !important;
+
+              font-size: 25px !important;
+              line-height: 1 !important;
+            }
+
+            /* ---------------------------------------------
+               HERO / LIVE INFORMATION
+               --------------------------------------------- */
+
+            .scene {
+              overflow: visible !important;
+              perspective: none !important;
+              transform: none !important;
+              animation: none !important;
+            }
+
+            /* Stable live-information card.
+               No 3D transform, no movement, no flicker. */
+            .hud-depth {
+              position: absolute !important;
+
+              top: 378px !important;
+              bottom: auto !important;
+
+              left: 3% !important;
+              right: 3% !important;
+              width: 94% !important;
+
+              min-width: 0 !important;
+
+              z-index: 15 !important;
+
+              display: grid !important;
+              grid-template-columns: 1fr 1fr !important;
+
+              gap: 8px !important;
+
+              padding: 11px !important;
+
+              box-sizing: border-box !important;
+
+              transform: none !important;
+
+              border-radius: 16px !important;
+
+              background: rgba(3,14,27,.94) !important;
+
+              backdrop-filter: blur(18px) !important;
+              -webkit-backdrop-filter: blur(18px) !important;
+
+              animation: none !important;
+              transition: none !important;
+            }
+
+            .hud-depth > div {
+              min-width: 0 !important;
+              overflow: hidden !important;
+            }
+
+            .hud-depth span,
+            .hud-depth b,
+            .hud-depth strong,
+            .hud-depth small {
+              animation: none !important;
+              transition: none !important;
+              transform: none !important;
+            }
+
+            .hud-depth b {
+              font-size: 13px !important;
+              white-space: nowrap !important;
+            }
+
+            .calendar-live {
+              grid-column: 1 / -1 !important;
+            }
+
+            .calendar-live strong {
+              font-size: 15px !important;
+              white-space: nowrap !important;
+            }
+
+            .calendar-live small {
+              font-size: 10px !important;
+            }
+
+            /* ---------------------------------------------
+               "امکانات" ABOVE ANDROID BOTTOM NAV
+               --------------------------------------------- */
+
+            .android-native-shell .command-fab {
+              bottom: 76px !important;
+              z-index: 10040 !important;
+            }
+
+            .android-native-shell .command-panel {
+              bottom: 132px !important;
+              z-index: 10041 !important;
+            }
+          }
+
+          @media (max-width: 390px) {
+
+            .header-tools {
+              gap: 4px !important;
+            }
+
+            .header-tools #clock,
+            .header-tools #musicBtn,
+            .header-tools #menuBtn {
+              width: 42px !important;
+              height: 42px !important;
+              min-width: 42px !important;
+              min-height: 42px !important;
+              flex-basis: 42px !important;
+            }
+
+            .header-tools #clock {
+              font-size: 8.5px !important;
+            }
+          }
+
+          /* Short and subtle touch response. */
+          button:active,
+          .btn:active,
+          a:active {
+            filter: brightness(1.16) !important;
             transform: none !important;
           }
+          '''
 
-          .hm-v6-touch {
-            animation: hmV6Touch 140ms ease-out !important;
-          }
+          if "HM STUDIO V6 — FINAL MOBILE HEADER / HERO FIX" not in css:
+              css += final_css
 
-          @keyframes hmV6Touch {
-            0% {
-              filter: brightness(1);
+          css_file.write_text(css, encoding="utf-8")
+
+          # ============================================================
+          # 2. REMOVE THE SECOND CLOCK/TIMER
+          #
+          # The original V6 has updateClock() near the top AND another
+          # updateCalendar() near the bottom. Both run every second.
+          # That causes unnecessary DOM replacement/flicker.
+          #
+          # Keep the original updateClock() only.
+          # ============================================================
+
+          js = js_file.read_text(encoding="utf-8")
+
+          start = js.find("  function updateCalendar(){")
+          end = js.find("  const fab=", start)
+
+          if start != -1 and end != -1:
+              js = (
+                  js[:start]
+                  + "  /* V6 FIX: one live clock/date updater only. */\n"
+                  + js[end:]
+              )
+
+          # ============================================================
+          # 3. ADD REAL EMAIL ACTION TO PROJECT ORDER
+          #
+          # Existing WhatsApp + SMS actions are preserved.
+          # Email opens the actual Android email application.
+          # ============================================================
+
+          if "ارسال سفارش با ایمیل" not in js:
+
+              marker = "  const sms=document.createElement('button');"
+
+              email_block = """  const email=document.createElement('button');
+          email.type='button';
+          email.className='btn ghost';
+          email.textContent='ارسال سفارش با ایمیل';
+
+          email.onclick=()=>{
+            const subject=encodeURIComponent('HM Studio - Project Order');
+            const body=encodeURIComponent(message);
+            const href='mailto:m74981819@gmail.com?subject='+subject+'&body='+body;
+
+            if(window.HMNative?.openUrl){
+              window.HMNative.openUrl(href);
+            }else{
+              window.location.href=href;
             }
+          };
 
-            50% {
-              filter: brightness(1.30);
-            }
+          """
 
-            100% {
-              filter: brightness(1);
-            }
-          }
-          EOF
+              if marker not in js:
+                  raise SystemExit("ERROR: SMS action anchor not found.")
 
-      - name: Add V6 bugfix JavaScript
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          mkdir -p "$PROJECT_DIR/app/src/main/assets/js"
-
-          cat > "$PROJECT_DIR/app/src/main/assets/js/hm-v6-bugfix.js" <<'EOF'
-          (function () {
-            "use strict";
-
-            function hideDepthLabel() {
-              document
-                .querySelectorAll('[data-i18n="depthLabel"]')
-                .forEach(function (el) {
-                  el.style.display = "none";
-                });
-            }
-
-            function stabilizeExistingClock() {
-              [
-                "#clock",
-                "#heroClock",
-                "#heroDate",
-                "#heroCalendar",
-                "#heroWeekday"
-              ].forEach(function (selector) {
-                document
-                  .querySelectorAll(selector)
-                  .forEach(function (el) {
-                    el.classList.add("hm-v6-stable-info");
-                  });
-              });
-            }
-
-            function addShortTouchFeedback() {
-              document.addEventListener(
-                "pointerdown",
-                function (event) {
-                  var target = event.target.closest(
-                    "button, .icon-btn, .music-btn, a"
-                  );
-
-                  if (!target) {
-                    return;
-                  }
-
-                  target.classList.remove("hm-v6-touch");
-
-                  void target.offsetWidth;
-
-                  target.classList.add("hm-v6-touch");
-
-                  window.setTimeout(function () {
-                    target.classList.remove("hm-v6-touch");
-                  }, 180);
-                },
-                { passive: true }
-              );
-            }
-
-            function removeOldPatchElements() {
-              var oldClock =
-                document.getElementById("hm-stable-clock");
-
-              if (oldClock) {
-                oldClock.remove();
-              }
-
-              var oldFeatures =
-                document.getElementById("hm-features-button");
-
-              if (oldFeatures) {
-                oldFeatures.remove();
-              }
-            }
-
-            function init() {
-              removeOldPatchElements();
-              hideDepthLabel();
-              stabilizeExistingClock();
-              addShortTouchFeedback();
-            }
-
-            if (document.readyState === "loading") {
-              document.addEventListener(
-                "DOMContentLoaded",
-                init,
-                { once: true }
-              );
-            } else {
-              init();
-            }
-          })();
-          EOF
-
-      - name: Attach V6 bugfix files
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          INDEX="$PROJECT_DIR/app/src/main/assets/index.html"
-
-          python3 - "$INDEX" <<'PY'
-          import sys
-          from pathlib import Path
-
-          index = Path(sys.argv[1])
-          text = index.read_text(encoding="utf-8")
-
-          css_tag = '<link rel="stylesheet" href="css/hm-v6-bugfix.css">'
-          js_tag = '<script src="js/hm-v6-bugfix.js"></script>'
-
-          if css_tag not in text:
-              if "</head>" not in text:
-                  raise SystemExit("ERROR: </head> not found")
-              text = text.replace(
-                  "</head>",
-                  css_tag + "\n</head>",
+              js = js.replace(
+                  marker,
+                  email_block + marker,
                   1
               )
 
-          if js_tag not in text:
-              if "</body>" not in text:
-                  raise SystemExit("ERROR: </body> not found")
-              text = text.replace(
-                  "</body>",
-                  js_tag + "\n</body>",
+              js = js.replace(
+                  "  actions.append(wa,sms);",
+                  "  actions.append(wa,sms,email);",
                   1
               )
 
-          index.write_text(text, encoding="utf-8")
+          js_file.write_text(js, encoding="utf-8")
 
-          print("Bugfix CSS and JavaScript attached successfully.")
+          # ============================================================
+          # 4. NATIVE ANDROID BOTTOM BAR POSITION
+          #
+          # The Android shell has a real bottom navigation bar.
+          # Move the web "امکانات" button/panel above it.
+          # ============================================================
+
+          java = java_file.read_text(encoding="utf-8")
+
+          old_style = (
+              "body{padding-bottom:66px!important}"
+              ".section,.hero{scroll-margin-top:112px!important}';"
+          )
+
+          new_style = (
+              "body{padding-bottom:66px!important}"
+              ".section,.hero{scroll-margin-top:112px!important}"
+              ".android-native-shell .command-fab{bottom:76px!important;z-index:10040!important}"
+              ".android-native-shell .command-panel{bottom:132px!important;z-index:10041!important}';"
+          )
+
+          if old_style in java and ".android-native-shell .command-fab" not in java:
+              java = java.replace(
+                  old_style,
+                  new_style,
+                  1
+              )
+
+          java_file.write_text(java, encoding="utf-8")
+
+          print("======================================")
+          print("V6 SOURCE FIXES APPLIED")
+          print("======================================")
+          print("1. Mobile top bar: clock + music + hamburger")
+          print("2. Yellow button is real music button")
+          print("3. Hamburger behavior untouched")
+          print("4. Duplicate live clock removed")
+          print("5. Giant 5D label removed")
+          print("6. Live info panel stabilized")
+          print("7. امکانات moved above Android bottom bar")
+          print("8. Project order now has WhatsApp + SMS + Email")
           PY
+
+      - name: Validate patched files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "======================================"
+          echo "VALIDATING PATCHED V6"
+          echo "======================================"
+
+          grep -q "HM STUDIO V6 — FINAL MOBILE HEADER / HERO FIX" \
+            "$PROJECT_DIR/app/src/main/assets/css/styles.css"
+
+          grep -q "ارسال سفارش با ایمیل" \
+            "$PROJECT_DIR/app/src/main/assets/js/app.js"
+
+          grep -q "android-native-shell .command-fab" \
+            "$PROJECT_DIR/app/src/main/java/com/hmstudio/app/MainActivity.java"
+
+          node --check \
+            "$PROJECT_DIR/app/src/main/assets/js/app.js"
+
+          echo "JavaScript syntax check passed."
+          echo "V6 patch validation passed."
 
       - name: Build Debug APK
         shell: bash
@@ -319,25 +526,23 @@ jobs:
 
           cd "$PROJECT_DIR"
 
-          echo "Gradle version:"
+          echo "Gradle:"
           gradle --version
-
-          echo "Starting Android build..."
 
           gradle :app:assembleDebug \
             --no-daemon \
             --stacktrace \
             --warning-mode all
 
-          echo "Android build completed successfully."
+          echo "BUILD SUCCESSFUL"
 
-      - name: Locate generated APK
+      - name: Locate APK
         shell: bash
         run: |
           set -euo pipefail
 
           echo "======================================"
-          echo "LOCATING GENERATED APK"
+          echo "LOCATING APK"
           echo "======================================"
 
           APK="$(find "$PROJECT_DIR/app/build/outputs/apk" \
@@ -348,34 +553,29 @@ jobs:
 
           if [ -z "$APK" ]; then
             echo "ERROR: APK was not generated."
-
-            echo "Build output tree:"
+            echo ""
+            echo "Build output:"
             find "$PROJECT_DIR/app/build" \
               -maxdepth 10 \
               -type f \
               -print \
               2>/dev/null \
               | sort || true
-
             exit 1
           fi
-
-          echo "APK FOUND:"
-          echo "$APK"
 
           mkdir -p "$GITHUB_WORKSPACE/apk-output"
 
           cp "$APK" \
-            "$GITHUB_WORKSPACE/apk-output/HM-Studio-V6-Bugfix.apk"
+            "$GITHUB_WORKSPACE/apk-output/HM-Studio-V6-FINAL.apk"
 
-          echo "Final APK:"
-          ls -lh \
-            "$GITHUB_WORKSPACE/apk-output/HM-Studio-V6-Bugfix.apk"
+          echo "APK FOUND:"
+          ls -lh "$GITHUB_WORKSPACE/apk-output/HM-Studio-V6-FINAL.apk"
 
-      - name: Upload APK artifact
+      - name: Upload final APK
         uses: actions/upload-artifact@v4
         with:
-          name: HM-Studio-V6-Bugfix
-          path: apk-output/HM-Studio-V6-Bugfix.apk
+          name: HM-Studio-V6-FINAL
+          path: apk-output/HM-Studio-V6-FINAL.apk
           if-no-files-found: error
           retention-days: 14
