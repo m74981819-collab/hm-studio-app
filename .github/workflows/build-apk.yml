@@ -1,294 +1,36 @@
-name: Build HM Studio V6 APK
-
-on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-jobs:
-  build:
-    name: Build Android APK
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Find V6 source
-        shell: bash
-        run: |
-          set -e
-
-          ZIP_FILE="$(find . -type f -name 'hm-studio-app-v6-corrected.zip' | head -n 1)"
-
-          if [ -z "$ZIP_FILE" ]; then
-            echo "V6 source ZIP not found"
-            exit 1
-          fi
-
-          echo "Using: $ZIP_FILE"
-
-          rm -rf v6-source
-          mkdir -p v6-source
-          unzip -q "$ZIP_FILE" -d v6-source
-
-          SETTINGS="$(find v6-source -type f -name 'settings.gradle' | head -n 1)"
-
-          if [ -z "$SETTINGS" ]; then
-            echo "settings.gradle not found"
-            exit 1
-          fi
-
-          PROJECT_DIR="$(dirname "$SETTINGS")"
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-      - name: Check V6 source
-        shell: bash
-        run: |
-          set -e
-
-          test -f "$PROJECT_DIR/app/src/main/assets/index.html"
-          test -f "$PROJECT_DIR/app/src/main/assets/js/app.js"
-
-          echo "V6 source OK"
-
-      - name: Add bugfix CSS
-        shell: bash
-        run: |
-          set -e
-
-          mkdir -p "$PROJECT_DIR/app/src/main/assets/css"
-
-          cat > "$PROJECT_DIR/app/src/main/assets/css/hm-v6-bugfix.css" <<'EOF'
-          html,
-          body {
-            overflow-x: hidden !important;
-          }
-
-          .live-clock,
-          #clock {
-            display: inline-flex !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            animation: none !important;
-            transition: none !important;
-            transform: none !important;
-            white-space: nowrap !important;
-          }
-
-          #heroClock,
-          #heroDate,
-          #heroCalendar,
-          #heroWeekday {
-            visibility: visible !important;
-            opacity: 1 !important;
-            animation: none !important;
-            transition: none !important;
-            transform: none !important;
-          }
-
-          [data-i18n="depthLabel"] {
-            display: none !important;
-          }
-
-          .glass-console strong[data-i18n="depthLabel"] {
-            display: none !important;
-          }
-
-          .header-tools .icon-btn,
-          .header-tools .music-btn,
-          .header-tools button {
-            min-width: 44px !important;
-            width: 44px !important;
-            min-height: 44px !important;
-            height: 44px !important;
-            box-sizing: border-box !important;
-          }
-
-          .hm-v6-stable-info {
-            animation: none !important;
-            transition: none !important;
-          }
-
-          .hm-v6-touch {
-            animation: hmV6Touch 140ms ease-out !important;
-          }
-
-          @keyframes hmV6Touch {
-            0% {
-              filter: brightness(1);
-            }
-
-            50% {
-              filter: brightness(1.35);
-            }
-
-            100% {
-              filter: brightness(1);
-            }
-          }
-          EOF
-
-      - name: Add bugfix JavaScript
-        shell: bash
-        run: |
-          set -e
-
-          mkdir -p "$PROJECT_DIR/app/src/main/assets/js"
-
-          cat > "$PROJECT_DIR/app/src/main/assets/js/hm-v6-bugfix.js" <<'EOF'
-          (function () {
-            "use strict";
-
-            function hideDepthLabel() {
-              document
-                .querySelectorAll('[data-i18n="depthLabel"]')
-                .forEach(function (el) {
-                  el.style.display = "none";
-                });
-            }
-
-            function stabilizeExistingClock() {
-              [
-                "#clock",
-                "#heroClock",
-                "#heroDate",
-                "#heroCalendar",
-                "#heroWeekday"
-              ].forEach(function (selector) {
-                document.querySelectorAll(selector).forEach(function (el) {
-                  el.classList.add("hm-v6-stable-info");
-                });
-              });
-            }
-
-            function addShortTouchFeedback() {
-              document.addEventListener(
-                "pointerdown",
-                function (event) {
-                  var target = event.target.closest(
-                    "button, .icon-btn, .music-btn, a"
-                  );
-
-                  if (!target) {
-                    return;
-                  }
-
-                  target.classList.remove("hm-v6-touch");
-                  void target.offsetWidth;
-                  target.classList.add("hm-v6-touch");
-
-                  window.setTimeout(function () {
-                    target.classList.remove("hm-v6-touch");
-                  }, 180);
-                },
-                { passive: true }
-              );
-            }
-
-            function cleanupOldPatchElements() {
-              var oldClock = document.getElementById("hm-stable-clock");
-              if (oldClock) {
-                oldClock.remove();
-              }
-
-              var oldFeatures =
-                document.getElementById("hm-features-button");
-
-              if (oldFeatures) {
-                oldFeatures.remove();
-              }
-            }
-
-            function init() {
-              cleanupOldPatchElements();
-              hideDepthLabel();
-              stabilizeExistingClock();
-              addShortTouchFeedback();
-            }
-
-            if (document.readyState === "loading") {
-              document.addEventListener(
-                "DOMContentLoaded",
-                init,
-                { once: true }
-              );
-            } else {
-              init();
-            }
-          })();
-          EOF
-
-      - name: Attach bugfix files
-        shell: bash
-        run: |
-          set -e
-
-          INDEX="$PROJECT_DIR/app/src/main/assets/index.html"
-
-          python3 - "$INDEX" <<'PY'
-          import sys
-          from pathlib import Path
-
-          index = Path(sys.argv[1])
-          text = index.read_text(encoding="utf-8")
-
-          css_tag = '<link rel="stylesheet" href="css/hm-v6-bugfix.css">'
-          js_tag = '<script src="js/hm-v6-bugfix.js"></script>'
-
-          if css_tag not in text:
-              if "</head>" not in text:
-                  raise SystemExit("Missing </head>")
-              text = text.replace(
-                  "</head>",
-                  css_tag + "\n</head>",
-                  1
-              )
-
-          if js_tag not in text:
-              if "</body>" not in text:
-                  raise SystemExit("Missing </body>")
-              text = text.replace(
-                  "</body>",
-                  js_tag + "\n</body>",
-                  1
-              )
-
-          index.write_text(text, encoding="utf-8")
-          PY
-
       - name: Build APK
         shell: bash
         run: |
           set -e
 
           cd "$PROJECT_DIR"
+
           chmod +x gradlew
-          ./gradlew --no-daemon --stacktrace assembleDebug
+
+          ./gradlew --no-daemon --console=plain clean assembleDebug
+
+          echo "Searching for generated APK..."
+          find "$GITHUB_WORKSPACE/v6-source" -type f -name "*.apk" -print
 
       - name: Find APK
         shell: bash
         run: |
           set -e
 
-          APK="$(find "$PROJECT_DIR/app/build/outputs/apk" -type f -name '*.apk' | head -n 1)"
+          APK="$(find "$GITHUB_WORKSPACE/v6-source" -type f -name '*.apk' | head -n 1)"
 
           if [ -z "$APK" ]; then
-            echo "APK was not generated"
+            echo "ERROR: No APK was generated."
+            echo "Gradle project:"
+            echo "$PROJECT_DIR"
+            echo ""
+            echo "APK files found:"
+            find "$GITHUB_WORKSPACE/v6-source" -type f -name '*.apk' -print || true
             exit 1
           fi
 
-          echo "APK generated:"
+          echo "APK found:"
+          echo "$APK"
           ls -lh "$APK"
 
           cp "$APK" "$GITHUB_WORKSPACE/HM-Studio-V6-Bugfix.apk"
