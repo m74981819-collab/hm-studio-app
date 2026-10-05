@@ -1,4 +1,4 @@
-name: HM Studio V6 Final APK
+name: Build HM Studio V6 APK
 
 on:
   push:
@@ -21,43 +21,37 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-          cache: gradle
-
-      - name: Setup Gradle 8.11.1
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: ${{ env.GRADLE_VERSION }}
-
       - name: Find and extract V6 source
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "Searching for V6 source ZIP..."
+          echo "======================================"
+          echo "FINDING V6 SOURCE ZIP"
+          echo "======================================"
 
-          ZIP_FILE="$(find "$GITHUB_WORKSPACE" -type f -name 'hm-studio-app-v6-corrected.zip' | head -n 1)"
+          ZIP_FILE="$(find "$GITHUB_WORKSPACE" -type f -name 'hm-studio-app-v6-corrected.zip' -print -quit)"
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: hm-studio-app-v6-corrected.zip not found."
+            echo "ERROR: hm-studio-app-v6-corrected.zip was not found."
+            echo "Repository files:"
+            find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -print | sort || true
             exit 1
           fi
 
-          echo "V6 source: $ZIP_FILE"
+          echo "V6 ZIP:"
+          echo "$ZIP_FILE"
 
           rm -rf "$GITHUB_WORKSPACE/v6-source"
           mkdir -p "$GITHUB_WORKSPACE/v6-source"
 
           unzip -q "$ZIP_FILE" -d "$GITHUB_WORKSPACE/v6-source"
 
-          SETTINGS_FILE="$(find "$GITHUB_WORKSPACE/v6-source" -type f -name 'settings.gradle' | head -n 1)"
+          SETTINGS_FILE="$(find "$GITHUB_WORKSPACE/v6-source" -type f -name 'settings.gradle' -print -quit)"
 
           if [ -z "$SETTINGS_FILE" ]; then
-            echo "ERROR: settings.gradle not found."
+            echo "ERROR: settings.gradle was not found after extraction."
+            find "$GITHUB_WORKSPACE/v6-source" -maxdepth 5 -type f -print | sort || true
             exit 1
           fi
 
@@ -68,10 +62,28 @@ jobs:
           echo "Android project:"
           echo "$PROJECT_DIR"
 
+          echo "Project files:"
+          find "$PROJECT_DIR" -maxdepth 3 -type f -print | sort | head -200
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+
       - name: Verify V6 Android project
         shell: bash
         run: |
           set -euo pipefail
+
+          echo "======================================"
+          echo "VERIFYING ANDROID PROJECT"
+          echo "======================================"
 
           test -f "$PROJECT_DIR/settings.gradle"
           test -f "$PROJECT_DIR/build.gradle"
@@ -138,6 +150,7 @@ jobs:
           .hm-v6-stable-info {
             animation: none !important;
             transition: none !important;
+            transform: none !important;
           }
 
           .hm-v6-touch {
@@ -150,7 +163,7 @@ jobs:
             }
 
             50% {
-              filter: brightness(1.35);
+              filter: brightness(1.30);
             }
 
             100% {
@@ -186,9 +199,11 @@ jobs:
                 "#heroCalendar",
                 "#heroWeekday"
               ].forEach(function (selector) {
-                document.querySelectorAll(selector).forEach(function (el) {
-                  el.classList.add("hm-v6-stable-info");
-                });
+                document
+                  .querySelectorAll(selector)
+                  .forEach(function (el) {
+                    el.classList.add("hm-v6-stable-info");
+                  });
               });
             }
 
@@ -219,7 +234,8 @@ jobs:
             }
 
             function removeOldPatchElements() {
-              var oldClock = document.getElementById("hm-stable-clock");
+              var oldClock =
+                document.getElementById("hm-stable-clock");
 
               if (oldClock) {
                 oldClock.remove();
@@ -252,7 +268,7 @@ jobs:
           })();
           EOF
 
-      - name: Attach bugfix files
+      - name: Attach V6 bugfix files
         shell: bash
         run: |
           set -euo pipefail
@@ -288,12 +304,18 @@ jobs:
               )
 
           index.write_text(text, encoding="utf-8")
+
+          print("Bugfix CSS and JavaScript attached successfully.")
           PY
 
       - name: Build Debug APK
         shell: bash
         run: |
           set -euo pipefail
+
+          echo "======================================"
+          echo "BUILDING HM STUDIO V6 APK"
+          echo "======================================"
 
           cd "$PROJECT_DIR"
 
@@ -307,27 +329,29 @@ jobs:
             --stacktrace \
             --warning-mode all
 
-          echo "Build command completed."
+          echo "Android build completed successfully."
 
       - name: Locate generated APK
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "Searching for APK..."
+          echo "======================================"
+          echo "LOCATING GENERATED APK"
+          echo "======================================"
 
-          APK="$(find "$PROJECT_DIR/app/build/outputs" \
+          APK="$(find "$PROJECT_DIR/app/build/outputs/apk" \
             -type f \
             -name '*.apk' \
             -print \
-            | head -n 1)"
+            -quit 2>/dev/null || true)"
 
           if [ -z "$APK" ]; then
             echo "ERROR: APK was not generated."
 
-            echo "Contents of app/build:"
+            echo "Build output tree:"
             find "$PROJECT_DIR/app/build" \
-              -maxdepth 8 \
+              -maxdepth 10 \
               -type f \
               -print \
               2>/dev/null \
@@ -344,10 +368,11 @@ jobs:
           cp "$APK" \
             "$GITHUB_WORKSPACE/apk-output/HM-Studio-V6-Bugfix.apk"
 
+          echo "Final APK:"
           ls -lh \
             "$GITHUB_WORKSPACE/apk-output/HM-Studio-V6-Bugfix.apk"
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: HM-Studio-V6-Bugfix
